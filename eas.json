@@ -6,31 +6,13 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "googleServicesFile": "./google-services.json"
-      },
-      "ios": {
-        "googleServicesFile": "./GoogleService-Info.plist"
-      }
+      "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "android": {
-        "googleServicesFile": "./google-services.json"
-      },
-      "ios": {
-        "googleServicesFile": "./GoogleService-Info.plist"
-      }
+      "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "android": {
-        "googleServicesFile": "./google-services.json"
-      },
-      "ios": {
-        "googleServicesFile": "./GoogleService-Info.plist"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
