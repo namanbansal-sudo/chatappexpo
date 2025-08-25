@@ -400,13 +400,13 @@ export default function ChatRoom() {
             </View>
           )}
 
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <CustomText color={msgColor} style={{ flex: 1 }}>{item.text}</CustomText>
+          <View>
+            <CustomText color={msgColor}>{item.text}</CustomText>
             {deletingMessageId === item.id && (
               <ActivityIndicator 
                 size="small" 
                 color={isUser ? 'rgba(255,255,255,0.8)' : theme.colors.primary} 
-                style={{ marginLeft: 8 }}
+                style={{ marginTop: 4, alignSelf: 'center' }}
               />
             )}
           </View>
