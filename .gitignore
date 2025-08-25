@@ -36,10 +36,6 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# Firebase config files (contain sensitive data)
-GoogleService-Info.plist
-google-services.json
-
 # IDE files
 .vscode/
 .idea/

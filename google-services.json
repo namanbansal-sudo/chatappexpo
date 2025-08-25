@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1033883364384",
+    "project_id": "chatapp-expo-dbd9d",
+    "storage_bucket": "chatapp-expo-dbd9d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1033883364384:android:9d72856b347ae9e4b0e045",
+        "android_client_info": {
+          "package_name": "com.naman_bitcot.chatappexpo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1033883364384-6sud4jpidcrvsnj7ulcrm4s9gt3n90g0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.naman_bitcot.chatappexpo",
+            "certificate_hash": "8a81e67ca5c89f6d8ac58d0193d55980927851e5"
+          }
+        },
+        {
+          "client_id": "1033883364384-jlirmds7rkarc7n8lqcsh1mm9fhn8p6a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRU5DTdQ7LQp8TaH8wpUgiqfso_R_tMz4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1033883364384-jlirmds7rkarc7n8lqcsh1mm9fhn8p6a.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
