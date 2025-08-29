@@ -8,7 +8,7 @@ import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -119,6 +119,8 @@ export default function ChatRoom() {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: "image" | "video" | "audio" } | null>(null);
+  const [currentSound, setCurrentSound] = useState<Audio.Sound | null>(null);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
 
   const flatListRef = useRef<FlatList<MessageWithHeader>>(null);
 
@@ -203,6 +205,7 @@ export default function ChatRoom() {
       setAudioUri(uri);
       setRecording(null);
       if (uri) {
+        console.log('uri', uri)
         await handleAudioUpload(uri);
       }
     } catch (error) {
@@ -211,13 +214,75 @@ export default function ChatRoom() {
     }
   };
 
-  const playAudio = async (uri: string) => {
+  const playAudio = async (uri: string, messageId: string) => {
     try {
-      const { sound } = await Audio.Sound.createAsync({ uri });
+      // If clicking on currently playing audio, pause it
+      if (playingAudioId === messageId && currentSound) {
+        const status = await currentSound.getStatusAsync();
+        if (status.isLoaded) {
+          if (status.isPlaying) {
+            await currentSound.pauseAsync();
+            setPlayingAudioId(null);
+          } else {
+            await currentSound.playAsync();
+            setPlayingAudioId(messageId);
+          }
+        }
+        return;
+      }
+
+      // Stop any currently playing audio
+      if (currentSound) {
+        try {
+          const status = await currentSound.getStatusAsync();
+          if (status.isLoaded) {
+            await currentSound.stopAsync();
+          }
+          await currentSound.unloadAsync();
+        } catch (e) {
+          console.log("Error stopping previous sound:", e);
+        }
+        setCurrentSound(null);
+        setPlayingAudioId(null);
+      }
+
+      // Configure audio mode for playback
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+
+      // Create sound without auto-play first
+      const { sound } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: false, isLooping: false }
+      );
+
+      setCurrentSound(sound);
+
+      // Set up playback status listener before playing
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded) {
+          if (status.didJustFinish) {
+            setPlayingAudioId(null);
+            sound.unloadAsync().catch(console.error);
+            setCurrentSound(null);
+          }
+        }
+      });
+
+      // Now play the sound after it's set up
       await sound.playAsync();
+      setPlayingAudioId(messageId);
+
     } catch (error) {
       console.error("Error playing audio:", error);
       Alert.alert(t("common.error"), t("chat.audioPlaybackError"));
+      setPlayingAudioId(null);
+      setCurrentSound(null);
     }
   };
 
@@ -227,12 +292,12 @@ export default function ChatRoom() {
       uri,
       type: "audio/m4a",
       name: "voice-note.m4a",
-    } as any); // Type cast to bypass TypeScript issues with FormData
+    } as any); 
     formData.append("upload_preset", "chatsupp_Preset");
 
     try {
       const response = await fetch(
-        "https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/upload", // Replace YOUR_CLOUD_NAME with your actual Cloudinary cloud name
+        "https://api.cloudinary.com/v1_1/dtwqn1r7v/upload", 
         {
           method: "POST",
           body: formData,
@@ -279,6 +344,7 @@ export default function ChatRoom() {
     if (messages.length === 0 || getDateHeaderText(optimisticMessage.timestamp) !== getDateHeaderText(messages[0].timestamp)) {
       updatedMessages[0] = { ...optimisticMessage, showDateHeader: true, dateHeaderText: getDateHeaderText(optimisticMessage.timestamp) };
     }
+    console.log('uri', uri)
     setMessages(updatedMessages);
     setReplyingTo(null);
     setAudioUri(null);
@@ -397,6 +463,17 @@ export default function ChatRoom() {
 
     return () => clearInterval(interval);
   }, [user?.uid, friendUserId]);
+
+  // Cleanup audio on component unmount
+  useEffect(() => {
+    return () => {
+      if (currentSound) {
+        currentSound.stopAsync().then(() => {
+          currentSound.unloadAsync();
+        }).catch(console.error);
+      }
+    };
+  }, [currentSound]);
 
   const handleReply = (message: Message) => setReplyingTo(message);
 
@@ -797,9 +874,9 @@ export default function ChatRoom() {
             {item.mediaUrl && item.mediaType && (
               <TouchableOpacity
                 onPress={() => {
-                  if (item.mediaType === "audio") {
-                    item.mediaUrl && playAudio(item.mediaUrl);
-                  } else {
+                  if (item.mediaType === "audio" && item.mediaUrl) {
+                    playAudio(item.mediaUrl, item.id);
+                  } else if (item.mediaUrl && item.mediaType) {
                     setSelectedMedia({ url: item.mediaUrl, type: item.mediaType });
                   }
                 }}
@@ -855,12 +932,16 @@ export default function ChatRoom() {
                       backgroundColor: isUser ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
                     }}
                   >
-                    <Ionicons name="play" size={30} color={isUser ? "white" : theme.colors.primary} />
+                    <Ionicons 
+                      name={playingAudioId === item.id ? "pause" : "play"} 
+                      size={30} 
+                      color={isUser ? "white" : theme.colors.primary} 
+                    />
                     <CustomText
                       color={isUser ? "white" : theme.colors.text}
                       style={{ marginLeft: 8 }}
                     >
-                      {t("chat.audioMessage")}
+                      {playingAudioId === item.id ? t("chat.playing") : t("chat.audioMessage")}
                     </CustomText>
                   </View>
                 ) : null}

@@ -15,11 +15,15 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.naman_bitcot.chatappexpo"
+      "package": "com.naman_bitcot.chatappexpo",
+      "permissions": ["RECORD_AUDIO"]
     },
     "ios": {
       "bundleIdentifier": "com.naman-bitcot.chatappexpo",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone to send voice messages."
+      }
     },
     "web": {
       "bundler": "metro",
@@ -31,7 +35,12 @@
       "@react-native-google-signin/google-signin",
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
-      "expo-audio"
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow chatsupp to access your microphone for recording voice notes."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
