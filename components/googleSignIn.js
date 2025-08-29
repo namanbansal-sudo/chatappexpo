@@ -6,9 +6,6 @@ let isConfigured = false;
 export function configureGoogleSignIn() {
   GoogleSignin.configure({
     webClientId: '1033883364384-jlirmds7rkarc7n8lqcsh1mm9fhn8p6a.apps.googleusercontent.com',
-    offlineAccess: true,
-    forceCodeForRefreshToken: true,
-    profileImageSize: 120,
   });
   isConfigured = true;
 }

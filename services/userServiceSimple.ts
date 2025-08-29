@@ -1,18 +1,17 @@
-// services/userServiceSimple.ts
-import { 
-  getFirestore,
-  collection, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc,
-  getDocs,
-  query,
-  orderBy,
-  startAt,
+import {
+  collection,
+  doc,
   endAt,
+  getDoc,
+  getDocs,
+  getFirestore,
   limit,
-  serverTimestamp
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  startAt,
+  updateDoc
 } from '@react-native-firebase/firestore';
 import { User } from '../types/models';
 
@@ -81,6 +80,15 @@ export const UserServiceSimple = {
     );
   },
 
+  async updateProfileImage(uid: string, photoURL: string): Promise<void> {
+    const db = getFirestore();
+    const userRef = doc(db, USERS, uid);
+    await updateDoc(userRef, {
+      photo: photoURL,
+      lastSeen: serverTimestamp(),
+    });
+  },
+
   async searchUsers(searchQuery: string, excludeUid: string, limitCount = 20): Promise<User[]> {
     const db = getFirestore();
     const usersCollection = collection(db, USERS);
@@ -125,5 +133,3 @@ export const UserServiceSimple = {
 };
 
 export type { User };
-
-

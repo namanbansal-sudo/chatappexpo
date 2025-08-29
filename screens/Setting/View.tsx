@@ -1,22 +1,24 @@
-// app/(tabs)/setting.tsx
+import { useNavigateToLogin } from "@/app/(services)/navigationService";
 import { CustomText } from "@/components/customText";
+import { signOutGoogle } from "@/components/googleSignIn";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { PopupEditProfile } from "@/components/PopupEditProfile";
 import { useThemeContext } from "@/components/ThemeContext";
-import { LanguageSelector } from "@/components/LanguageSelector";
-import { useLanguage } from '@/i18n';
+import { useLanguage } from "@/i18n";
+import { uploadToCloudinary } from "@/services/cloudinary";
+import { UserServiceSimple } from "@/services/userServiceSimple";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { signOutGoogle } from "@/components/googleSignIn";
-import { useNavigateToLogin } from "@/app/(services)/navigationService";
-import { UserServiceSimple } from "@/services/userServiceSimple";
-import React, { useMemo, useCallback } from "react";
+import * as ImagePicker from "expo-image-picker";
+import React, { useCallback, useMemo } from "react";
 import {
+  ActivityIndicator,
   Image,
-  TextInput,
+  Modal,
+  StyleSheet,
+  Switch,
   TouchableOpacity,
   View,
-  Switch,
-  StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -83,7 +85,7 @@ const ThemeToggleSection = React.memo(() => {
           fontSize={theme.fonts.sizes.regular}
           color={theme.colors.text}
         >
-          {isDark ? t('profile.darkMode') : t('profile.darkMode')}
+          {isDark ? t("profile.darkMode") : t("profile.darkMode")}
         </CustomText>
       </View>
       <Switch
@@ -103,6 +105,12 @@ export default function ProfileScreen() {
   const [user, setUser] = React.useState<any>(null);
   const [isEditVisible, setIsEditVisible] = React.useState(false);
   const [isImageEditVisible, setIsImageEditVisible] = React.useState(false);
+  const [showMediaOptions, setShowMediaOptions] = React.useState(false);
+  const [selectedMedia, setSelectedMedia] = React.useState<{
+    url: string;
+    type: "image";
+  } | null>(null);
+  const [uploading, setUploading] = React.useState(false);
   const navigateToLogin = useNavigateToLogin();
 
   React.useEffect(() => {
@@ -128,13 +136,74 @@ export default function ProfileScreen() {
   const handleImageUpdate = useCallback(
     async (newAvatar: string) => {
       if (!user) return;
-      const updated = { ...user, photoURL: newAvatar };
-      await AsyncStorage.setItem("user", JSON.stringify(updated));
-      setUser(updated);
-      setIsImageEditVisible(false);
+      try {
+        setUploading(true);
+        // Update AsyncStorage
+        const updated = { ...user, photoURL: newAvatar };
+        await AsyncStorage.setItem("user", JSON.stringify(updated));
+        // Update Firestore
+        await UserServiceSimple.updateProfileImage(user.uid, newAvatar);
+        setUser(updated);
+      } catch (error) {
+        console.error("Error updating profile image:", error);
+      } finally {
+        setUploading(false);
+        setIsImageEditVisible(false);
+        setShowMediaOptions(false);
+      }
     },
     [user]
   );
+
+  const pickImage = async () => {
+    setShowMediaOptions(false);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      try {
+        setUploading(true);
+        const cloudinaryUrl = await uploadToCloudinary(
+          result.assets[0].uri,
+          "image"
+        );
+        await handleImageUpdate(cloudinaryUrl);
+      } catch (error) {
+        console.error("Error uploading image:", error);
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
+
+  const takePhoto = async () => {
+    setShowMediaOptions(false);
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      try {
+        setUploading(true);
+        const cloudinaryUrl = await uploadToCloudinary(
+          result.assets[0].uri,
+          "image"
+        );
+        await handleImageUpdate(cloudinaryUrl);
+      } catch (error) {
+        console.error("Error uploading image:", error);
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
 
   const handleEditProfile = useCallback(() => {
     setIsEditVisible(true);
@@ -145,11 +214,12 @@ export default function ProfileScreen() {
   }, []);
 
   const handleOpenImageEdit = useCallback(() => {
-    setIsImageEditVisible(true);
+    setShowMediaOptions(true);
   }, []);
 
   const handleCloseImageEdit = useCallback(() => {
     setIsImageEditVisible(false);
+    setShowMediaOptions(false);
   }, []);
 
   const refreshUserData = useCallback(async () => {
@@ -193,11 +263,14 @@ export default function ProfileScreen() {
           console.log("✅ User online status updated to offline");
         }
       } catch (statusError) {
-        console.warn("⚠️ Failed to update online status:", (statusError as Error).message || statusError);
+        console.warn(
+          "⚠️ Failed to update online status:",
+          (statusError as Error).message || statusError
+        );
         // Continue with logout even if this fails
       }
 
-      // Sign out from Google and Firebase (this handles errors gracefully now)
+      // Sign out from Google and Firebase
       await signOutGoogle();
       console.log("✅ Sign out completed");
 
@@ -206,8 +279,10 @@ export default function ProfileScreen() {
         await AsyncStorage.clear();
         console.log("✅ Local storage cleared");
       } catch (storageError) {
-        console.warn("⚠️ Failed to clear storage:", (storageError as Error).message || storageError);
-        // Try to clear just the user key
+        console.warn(
+          "⚠️ Failed to clear storage:",
+          (storageError as Error).message || storageError
+        );
         try {
           await AsyncStorage.removeItem("user");
         } catch {}
@@ -279,6 +354,16 @@ export default function ProfileScreen() {
           borderWidth: 2,
           borderColor: theme.colors.background,
         },
+        profileImageLoader: {
+          width: 120,
+          height: 120,
+          borderRadius: 60,
+          borderWidth: 3,
+          borderColor: theme.colors.primary,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: theme.colors.card,
+        },
         profileInfoContainer: {
           width: "100%",
           backgroundColor: theme.colors.card,
@@ -331,6 +416,13 @@ export default function ProfileScreen() {
           borderWidth: 1,
           borderColor: theme.colors.border,
         },
+        mediaOptionsContainer: {
+          backgroundColor: theme.colors.background,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingVertical: 20,
+          paddingHorizontal: 20,
+        },
       }),
     [theme]
   );
@@ -339,13 +431,26 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       {/* Profile Picture - Centered Outside Box */}
       <View style={styles.profileImageContainer}>
-        <Image
-          source={{
-            uri:
-              user?.photoURL || user?.avatar || "https://placeholder.com/120",
-          }}
-          style={styles.profileImage}
-        />
+        {uploading ? (
+          <View style={styles.profileImageLoader}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={() =>
+              user?.photoURL &&
+              setSelectedMedia({ url: user.photoURL, type: "image" })
+            }
+          >
+            <Image
+              source={{
+                uri:
+                  user?.photoURL || user?.avatar || "https://placeholder.com/120",
+              }}
+              style={styles.profileImage}
+            />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.imageEditButton}
           onPress={handleOpenImageEdit}
@@ -425,7 +530,7 @@ export default function ProfileScreen() {
           fontSize={theme.fonts.sizes.regular}
           color={theme.colors.text}
         >
-          {t('Logout')}
+          {t("Logout")}
         </CustomText>
       </TouchableOpacity>
 
@@ -436,44 +541,124 @@ export default function ProfileScreen() {
         onClose={handleCloseEdit}
       />
 
-      {isImageEditVisible && (
-        <View style={styles.imageEditContainer}>
-          <View style={styles.imageEditBox}>
-            <TextInput
-              style={{
-                backgroundColor: theme.colors.background,
-                borderRadius: 5,
-                padding: 10,
-                marginBottom: 10,
-                color: theme.colors.text,
-              }}
-              placeholder="Enter new image URL"
-              placeholderTextColor={theme.colors.secondaryText}
-            />
-            <TouchableOpacity
-              style={{
-                backgroundColor: theme.colors.primary,
-                borderRadius: 5,
-                padding: 10,
-                alignItems: "center",
-              }}
-              onPress={() =>
-                handleImageUpdate("https://example.com/new-avatar.jpg")
-              }
+      {/* Media Selection Modal */}
+      <Modal
+        visible={showMediaOptions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMediaOptions(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            paddingHorizontal: 30,
+          }}
+          onPress={() => setShowMediaOptions(false)}
+        >
+          <View
+            style={[
+              styles.mediaOptionsContainer,
+              {
+                height: "25%",
+                marginVertical: "60%",
+              },
+            ]}
+          >
+            <CustomText
+              fontSize={theme.fonts.sizes.title}
+              color={theme.colors.text}
+              style={{ marginBottom: 30, textAlign: "center" }}
             >
-              <CustomText color={theme.colors.background} fontWeight="bold">
-                Update Image
-              </CustomText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ marginTop: 10, alignItems: "center" }}
-              onPress={handleCloseImageEdit}
+              {t("Profile Photo")}
+            </CustomText>
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-around" }}
             >
-              <CustomText color={theme.colors.secondaryText}>Cancel</CustomText>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={takePhoto}
+                style={{
+                  alignItems: "center",
+                  padding: 20,
+                  borderRadius: 15,
+                  backgroundColor: theme.colors.inputBackground,
+                  minWidth: 120,
+                }}
+                disabled={uploading}
+              >
+                <Ionicons
+                  name="camera"
+                  size={30}
+                  color={theme.colors.primary}
+                />
+                <CustomText
+                  color={theme.colors.text}
+                  style={{ marginTop: 8, fontSize: 12 }}
+                >
+                  {t("Camera")}
+                </CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={pickImage}
+                style={{
+                  alignItems: "center",
+                  padding: 20,
+                  borderRadius: 15,
+                  backgroundColor: theme.colors.inputBackground,
+                  minWidth: 120,
+                }}
+                disabled={uploading}
+              >
+                <Ionicons name="image" size={30} color={theme.colors.primary} />
+                <CustomText
+                  color={theme.colors.text}
+                  style={{ marginTop: 8, fontSize: 12 }}
+                >
+                  {t("Gallery")}
+                </CustomText>
+              </TouchableOpacity>
+            </View>
+            {uploading && (
+              <View style={{ alignItems: "center", marginTop: 20 }}>
+                <CustomText color={theme.colors.text}>
+                  {t("profile.uploading")}
+                </CustomText>
+              </View>
+            )}
           </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Image Preview Modal */}
+      <Modal
+        visible={!!selectedMedia}
+        animationType="fade"
+        onRequestClose={() => setSelectedMedia(null)}
+        transparent={false}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "black",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {selectedMedia?.type === "image" ? (
+            <Image
+              source={{ uri: selectedMedia.url }}
+              style={{ width: "100%", height: "100%", resizeMode: "contain" }}
+            />
+          ) : null}
+          <TouchableOpacity
+            style={{ position: "absolute", top: 40, left: 20 }}
+            onPress={() => setSelectedMedia(null)}
+          >
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
         </View>
-      )}
+      </Modal>
     </SafeAreaView>
   );
 }

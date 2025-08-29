@@ -1,18 +1,38 @@
-import React, { useMemo } from 'react';
-import { View, TouchableOpacity, Modal, Alert, Dimensions, ToastAndroid, Platform } from 'react-native';
+import { useLanguage } from '@/i18n';
 import { Ionicons } from '@expo/vector-icons';
+import React, { useMemo } from 'react';
+import { Alert, Dimensions, Modal, TouchableOpacity, View } from 'react-native';
 import { CustomText } from './customText';
 import { useThemeContext } from './ThemeContext';
-import { useLanguage } from '@/i18n';
-import * as Clipboard from 'expo-clipboard';
+
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'other';
+  time: string;
+  timestamp: Date;
+  replyTo?: {
+    messageId: string;
+    text: string;
+    senderId: string;
+    senderName: string;
+  };
+  edited?: boolean;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
+  fileName?: string;
+  isUploading?: boolean;
+}
 
 interface MessageContextMenuProps {
   visible: boolean;
   onClose: () => void;
-  message: any;
+  message: Message | null;
   onDelete: (messageId: string) => void;
-  onEdit: (message: any) => void;
-  onForward: (message: any) => void;
+  onEdit: (message: Message) => void;
+  onForward: (message: Message) => void;
+  onCopy: (message: Message) => void;
+  onDownload: (message: Message) => void;
   position: { x: number; y: number };
   isOwnMessage: boolean;
 }
@@ -24,6 +44,8 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   onDelete,
   onEdit,
   onForward,
+  onCopy,
+  onDownload,
   position,
   isOwnMessage,
 }) => {
@@ -31,44 +53,35 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   const { t } = useLanguage();
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-  
-  // Calculate smart positioning - moved before early return
+
+  // Calculate smart positioning
   const menuWidth = 150;
-  const menuHeight = isOwnMessage ? 200 : 120; // Approximate height based on items
-  
+  const menuItemCount = (isOwnMessage ? 2 : 0) + 2 + (message?.mediaUrl ? 1 : 0); // Edit, Delete, Copy, Forward, Download (if media)
+  const menuHeight = menuItemCount * 44 + 16; // Approximate
+
   const smartPosition = useMemo(() => {
     let x = position.x;
     let y = position.y;
-    
-    // Adjust horizontal position if menu would go off-screen
+
     if (x + menuWidth > screenWidth - 20) {
       x = screenWidth - menuWidth - 20;
     }
     if (x < 20) {
       x = 20;
     }
-    
-    // Adjust vertical position if menu would go off-screen
+
     if (y + menuHeight > screenHeight - 100) {
-      y = position.y - menuHeight - 20; // Show above the touch point
+      y = position.y - menuHeight - 20;
     }
     if (y < 100) {
-      y = 100; // Minimum top margin
+      y = 100;
     }
-    
+
     return { x, y };
-  }, [position.x, position.y, screenWidth, screenHeight, menuWidth, menuHeight, isOwnMessage]);
+  }, [position.x, position.y, screenWidth, screenHeight, menuWidth, menuHeight, isOwnMessage, message?.mediaUrl]);
 
   const handleCopy = async () => {
-    await Clipboard.setStringAsync(message.message || message.text || '');
-    
-    // Show platform-appropriate feedback
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(t('chat.messageCopied'), ToastAndroid.SHORT);
-    } else {
-      Alert.alert(t('common.success'), t('chat.messageCopied'), [{ text: t('common.ok') }]);
-    }
-    
+    await onCopy(message);
     onClose();
   };
 
@@ -82,7 +95,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
           text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
-            onDelete(message.id);
+            onDelete(message?.id || '');
             onClose();
           },
         },
@@ -91,6 +104,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   };
 
   const handleEdit = () => {
+    console.log('Edit option pressed for message:', { id: message?.id, text: message?.text, mediaUrl: message?.mediaUrl, isOwnMessage });
     onEdit(message);
     onClose();
   };
@@ -100,14 +114,35 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     onClose();
   };
 
-  if (!visible) return null;
+  const handleDownload = () => {
+    console.log('Download option pressed for message:', { id: message?.id, mediaUrl: message?.mediaUrl });
+    onDownload(message);
+    onClose();
+  };
+
+  if (!visible || !message) return null;
+
+  console.log('MessageContextMenu rendered with message:', {
+    id: message.id,
+    mediaUrl: message.mediaUrl,
+    mediaType: message.mediaType,
+    hasMedia: !!message.mediaUrl,
+    text: message.text,
+    isOwnMessage,
+  });
 
   const menuItems = [
     {
       icon: 'copy-outline',
       title: t('chat.copyMessage'),
       onPress: handleCopy,
-      show: true,
+      show: !!message.text || !!message.mediaUrl, // Show for text or media
+    },
+    {
+      icon: 'download-outline',
+      title: t('Download'),
+      onPress: handleDownload,
+      show: !!message.mediaUrl,
     },
     {
       icon: 'share-outline',
@@ -119,15 +154,17 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
       icon: 'create-outline',
       title: t('chat.editMessage'),
       onPress: handleEdit,
-      show: isOwnMessage,
+      show: isOwnMessage && !message.isUploading, // Show for all own messages, including media to add text
     },
     {
       icon: 'trash-outline',
       title: t('chat.deleteMessage'),
       onPress: handleDelete,
-      show: isOwnMessage,
+      show: isOwnMessage && !message.isUploading,
     },
   ];
+
+  console.log('Menu items to render:', menuItems.filter(item => item.show).map(item => item.title));
 
   return (
     <Modal transparent visible={visible} onRequestClose={onClose}>

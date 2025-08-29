@@ -45,7 +45,16 @@ export const CustomChatItem: React.FC<ChatItemProps> = (props) => {
           <CustomText fontWeight="bold" color={theme.colors.text}>{name}{emoji ? ` ${emoji}` : ''}</CustomText>
           {verified && <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} style={{ marginLeft: 5 }} />}
         </View>
-        <CustomText color={theme.colors.secondaryText} numberOfLines={1}>{message}</CustomText>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {message.startsWith('📷') ? (
+            <Ionicons name="camera" size={16} color={theme.colors.secondaryText} style={{ marginRight: 4 }} />
+          ) : message.startsWith('🎥') ? (
+            <Ionicons name="videocam" size={16} color={theme.colors.secondaryText} style={{ marginRight: 4 }} />
+          ) : null}
+          <CustomText color={theme.colors.secondaryText} numberOfLines={1} style={{ flex: 1 }}>
+            {message.startsWith('📷') ? 'Photo' : message.startsWith('🎥') ? 'Video' : message}
+          </CustomText>
+        </View>
       </View>
       <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
         <CustomText fontSize={theme.fonts.sizes.small} color={theme.colors.secondaryText}>{time}</CustomText>

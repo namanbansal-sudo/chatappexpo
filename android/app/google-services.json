@@ -14,11 +14,19 @@
       },
       "oauth_client": [
         {
-          "client_id": "1033883364384-6sud4jpidcrvsnj7ulcrm4s9gt3n90g0.apps.googleusercontent.com",
+          "client_id": "1033883364384-73pi2sjcef18pm91qsbnpnmnm77blm31.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.naman_bitcot.chatappexpo",
-            "certificate_hash": "8a81e67ca5c89f6d8ac58d0193d55980927851e5"
+            "certificate_hash": "2315b40a9b3dfcbf0a7ab6f2a808593c0d43f1ed"
+          }
+        },
+        {
+          "client_id": "1033883364384-fas3umkegdl0u31vqsnt6eskdmfl6ueg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.naman_bitcot.chatappexpo",
+            "certificate_hash": "e0e4c40539bf6557923c75424e0d0b410bc22d9f"
           }
         },
         {

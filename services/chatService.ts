@@ -1,25 +1,22 @@
-// services/chatService.ts
-import { 
-  getFirestore,
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  getDocs, 
-  doc, 
-  setDoc, 
-  updateDoc,
-  addDoc,
-  orderBy, 
-  limit,
-  serverTimestamp,
-  arrayUnion,
-  increment,
+import {
+  collection,
+  deleteDoc,
+  doc,
   getDoc,
+  getDocs,
+  getFirestore,
+  increment,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
   writeBatch,
-  deleteDoc
 } from '@react-native-firebase/firestore';
-import { Chat, ChatSimple, ChatMessage } from '../types/models';
+import { Chat, ChatMessage, ChatSimple } from '../types/models';
 
 type Unsubscribe = () => void;
 
@@ -36,24 +33,21 @@ export const ChatService = {
       const db = getFirestore();
       const senderDocRef = doc(db, 'users', senderId);
       const receiverDocRef = doc(db, 'users', receiverId);
-      const senderDoc = await getDoc(senderDocRef);
-      const receiverDoc = await getDoc(receiverDocRef);
+      const [senderDoc, receiverDoc] = await Promise.all([getDoc(senderDocRef), getDoc(receiverDocRef)]);
       
       console.log('🧪 Sender document:', {
-        exists: senderDoc.exists,
+        exists: senderDoc.exists(),
         data: senderDoc.data(),
-        id: senderDoc.id
+        id: senderDoc.id,
       });
       
       console.log('🧪 Receiver document:', {
-        exists: receiverDoc.exists, 
+        exists: receiverDoc.exists(), 
         data: receiverDoc.data(),
-        id: receiverDoc.id
+        id: receiverDoc.id,
       });
       
-      const senderExists = typeof (senderDoc as any).exists === 'function' ? (senderDoc as any).exists() : (senderDoc as any).exists;
-      const receiverExists = typeof (receiverDoc as any).exists === 'function' ? (receiverDoc as any).exists() : (receiverDoc as any).exists;
-      if (senderExists && receiverExists) {
+      if (senderDoc.exists() && receiverDoc.exists()) {
         const senderFriends = senderDoc.data()?.friends || [];
         const receiverFriends = receiverDoc.data()?.friends || [];
         
@@ -61,13 +55,17 @@ export const ChatService = {
           senderFriends,
           receiverFriends,
           senderHasReceiver: senderFriends.includes(receiverId),
-          receiverHasSender: receiverFriends.includes(senderId)
+          receiverHasSender: receiverFriends.includes(senderId),
         });
+      } else {
+        throw new Error(`User document(s) not found: sender=${senderDoc.exists()}, receiver=${receiverDoc.exists()}`);
       }
     } catch (error) {
       console.error('🧪 Error testing user documents:', error);
+      throw error;
     }
   },
+
   generateChatId(userA: string, userB: string): string {
     const [first, second] = [userA, userB].sort();
     return `${first}_${second}`;
@@ -81,14 +79,15 @@ export const ChatService = {
     userId: string,
     onChange: (chats: ChatSimple[]) => void
   ): Unsubscribe {
-    // Avoid requiring composite indexes by not ordering here; the UI can sort after resolving last message times
     const db = getFirestore();
     const chatQuery = query(collection(db, CHATS), where('participants', 'array-contains', userId));
 
     const unsubscribe = onSnapshot(chatQuery, {
       next: (snapshot) => {
-        const docs = snapshot?.docs ?? [];
-        const firebaseChats: ChatSimple[] = snapshot.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
+        const firebaseChats: ChatSimple[] = snapshot.docs.map((d: any) => ({
+          id: d.id,
+          ...d.data(),
+        }));
         onChange(firebaseChats);
       },
       error: (error) => {
@@ -111,8 +110,10 @@ export const ChatService = {
 
     return onSnapshot(messagesQuery, {
       next: (snapshot) => {
-        const docs = snapshot?.docs ?? [];
-        const items: ChatMessage[] = docs.map((docSnap: any) => ({ id: docSnap.id, ...(docSnap.data() as any) }));
+        const items: ChatMessage[] = snapshot.docs.map((docSnap: any) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
         onChange(items);
       },
       error: (error) => {
@@ -129,13 +130,10 @@ export const ChatService = {
     
     try {
       const snap = await getDoc(chatRef);
-      if (!snap.exists) {
-        // Ensure participants array is properly ordered and contains both users
+      if (!snap.exists()) {
         const participants = [currentUserId, otherUserId].sort();
         
         console.log(`🔍 Creating chat document ${chatId} with participants:`, participants);
-        console.log(`🔍 Current authenticated user: ${currentUserId}`);
-        console.log(`🔍 Other user: ${otherUserId}`);
         
         const initialUnreadCount: { [key: string]: number } = {};
         initialUnreadCount[currentUserId] = 0;
@@ -151,8 +149,6 @@ export const ChatService = {
           createdAt: serverTimestamp(),
         };
         
-        console.log(`🔍 Chat data to be created:`, chatData);
-        
         await setDoc(chatRef, chatData);
         console.log(`✅ Chat created successfully: ${chatId}`);
       } else {
@@ -160,20 +156,10 @@ export const ChatService = {
       }
     } catch (error) {
       console.error(`❌ Error creating chat ${chatId}:`, error);
-      console.error(`❌ Error details:`, {
-        currentUserId,
-        otherUserId,
-        chatId,
-        participants: [currentUserId, otherUserId].sort(),
-        error: error instanceof Error ? error.message : error
-      });
-      
-      // If creation fails, try to get the document again in case it was created by another process
       try {
         const retrySnap = await getDoc(chatRef);
-        if (!retrySnap.exists) {
-          console.warn(`❌ Chat creation failed, but continuing - chat will be created when first message is sent`);
-          // Don't throw - allow the flow to continue
+        if (!retrySnap.exists()) {
+          console.warn(`❌ Chat creation failed, but continuing`);
         } else {
           console.log(`✅ Chat found on retry: ${chatId}`);
         }
@@ -190,83 +176,52 @@ export const ChatService = {
     
     const db = getFirestore();
     
-    // First, verify that both users exist and are friends
     try {
       const senderDocRef = doc(db, 'users', senderId);
       const receiverDocRef = doc(db, 'users', receiverId);
-      const senderSnap = await getDoc(senderDocRef);
-      const receiverSnap = await getDoc(receiverDocRef);
+      const [senderSnap, receiverSnap] = await Promise.all([getDoc(senderDocRef), getDoc(receiverDocRef)]);
       
-      if (!senderSnap.exists()) {
-        throw new Error(`Sender user document not found: ${senderId}`);
-      }
-      if (!receiverSnap.exists()) {
-        throw new Error(`Receiver user document not found: ${receiverId}`);
-      }
+      if (!senderSnap.exists()) throw new Error(`Sender user document not found: ${senderId}`);
+      if (!receiverSnap.exists()) throw new Error(`Receiver user document not found: ${receiverId}`);
       
-      const senderFriends: string[] = (senderSnap.data()?.friends || []) as string[];
-      console.log('🔍 Sender friends list:', senderFriends);
-      
-      if (!senderFriends.includes(receiverId)) {
-        throw new Error('You can only chat after the receiver accepts your request.');
-      }
+      const senderFriends: string[] = senderSnap.data()?.friends || [];
+      if (!senderFriends.includes(receiverId)) throw new Error('You can only chat after the receiver accepts your request.');
     } catch (error) {
       console.error('❌ Error checking user friendship:', error);
       throw error;
     }
 
     const chatId = this.generateChatId(senderId, receiverId);
-    console.log('🔍 Generated chatId:', chatId);
-    
     const chatRef = doc(db, CHATS, chatId);
     const messagesRef = collection(db, CHATS, chatId, MESSAGES);
     const newMessageRef = doc(messagesRef);
     
-    console.log('🔍 References created');
-
     try {
-      // First, let's try to create just the message without transaction
-      console.log('🔍 Creating message document...');
       await setDoc(newMessageRef, {
-        senderId: senderId,
-        receiverId: receiverId,
-        message: message,
+        senderId,
+        receiverId,
+        message,
         type: 'text',
         status: 'sent',
         timestamp: serverTimestamp(),
-        chatId: chatId,
+        chatId,
       });
-      console.log('✅ Message document created successfully');
       
-      // Now update or create the chat document
       const chatSnap = await getDoc(chatRef);
-      
       if (!chatSnap.exists()) {
-        console.log('🔍 Creating new chat document...');
-        
         const chatData = {
           participants: [senderId, receiverId].sort(),
           lastMessage: message,
           lastMessageTime: serverTimestamp(),
           lastMessageSender: senderId,
           lastMessageId: newMessageRef.id,
-          unreadCount: {
-            [senderId]: 0,
-            [receiverId]: 1
-          },
+          unreadCount: { [senderId]: 0, [receiverId]: 1 },
           createdBy: senderId,
           createdAt: serverTimestamp(),
         };
-        
-        console.log('🔍 Chat data to create:', JSON.stringify(chatData, null, 2));
         await setDoc(chatRef, chatData);
-        console.log('✅ Chat document created successfully');
       } else {
-        console.log('🔍 Updating existing chat document...');
-        
-        const existingData = chatSnap.data() || {};
-        const currentUnreadCount = existingData.unreadCount || {};
-        
+        const currentUnreadCount = chatSnap.data()?.unreadCount || {};
         await updateDoc(chatRef, {
           lastMessage: message,
           lastMessageTime: serverTimestamp(),
@@ -274,18 +229,9 @@ export const ChatService = {
           lastMessageId: newMessageRef.id,
           [`unreadCount.${receiverId}`]: (currentUnreadCount[receiverId] || 0) + 1,
         });
-        console.log('✅ Chat document updated successfully');
       }
-      
     } catch (error) {
       console.error('❌ Error in sendMessage:', error);
-      console.error('❌ Error details:', {
-        senderId,
-        receiverId,
-        message,
-        chatId,
-        error: error instanceof Error ? error.message : error
-      });
       throw error;
     }
   },
@@ -305,19 +251,14 @@ export const ChatService = {
       batch.update(docSnap.ref, { status: 'read' });
     });
     
-    // Update unread count safely
     const updateData: { [key: string]: any } = {};
     updateData[`unreadCount.${userId}`] = 0;
-    updateData[`participantData.${userId}.unreadCount`] = 0; // keep legacy schema in sync
+    updateData[`participantData.${userId}`] = { unreadCount: 0 };
     batch.set(chatRef, updateData, { merge: true });
     
     await batch.commit();
   },
 
-  /**
-   * Best-effort: Mark messages sent by friend as read and reset unread counters for current user.
-   * Useful for legacy messages that may not have receiverId populated.
-   */
   async markIncomingFromSenderAsRead(chatId: string, currentUserId: string, friendUserId: string): Promise<void> {
     const db = getFirestore();
     const chatRef = doc(db, CHATS, chatId);
@@ -333,27 +274,26 @@ export const ChatService = {
       snap.docs.forEach((docSnap: any) => batch.update(docSnap.ref, { status: 'read' }));
       const updateData: { [key: string]: any } = {};
       updateData[`unreadCount.${currentUserId}`] = 0;
-      updateData[`participantData.${currentUserId}.unreadCount`] = 0;
+      updateData[`participantData.${currentUserId}`] = { unreadCount: 0 };
       batch.set(chatRef, updateData, { merge: true });
       await batch.commit();
     } else {
-      // Even if none matched, still zero out the counters to keep UI consistent
       await setDoc(chatRef, {
         [`unreadCount.${currentUserId}`]: 0,
-        [`participantData.${currentUserId}.unreadCount`]: 0,
-      } as any, { merge: true });
+        [`participantData.${currentUserId}`]: { unreadCount: 0 },
+      }, { merge: true });
     }
   },
 
   async sendMessageWithReply(
-    senderId: string, 
-    receiverId: string, 
-    message: string, 
-    replyTo?: { id: string; text: string; sender: 'user' | 'other' } | null
-  ): Promise<void> {
-    console.log('🔍 sendMessageWithReply called with:', { senderId, receiverId, message, replyTo });
+    senderId: string,
+    receiverId: string,
+    message: string,
+    replyTo?: { messageId: string; text: string; senderId: string; senderName: string } | null,
+    media?: { mediaUrl: string; mediaType: "image" | "video" | "audio"; fileName?: string }
+  ): Promise<string> {
+    console.log('🔍 sendMessageWithReply called with:', { senderId, receiverId, message, replyTo, media });
     
-    // Enforce that users must be friends before chatting
     try {
       const [senderSnap, receiverSnap] = await Promise.all([
         getDoc(doc(getFirestore(), USERS, senderId)),
@@ -361,23 +301,15 @@ export const ChatService = {
       ]);
       
       console.log('🔍 User documents exist:', { 
-        senderExists: senderSnap.exists, 
-        receiverExists: receiverSnap.exists 
+        senderExists: senderSnap.exists(), 
+        receiverExists: receiverSnap.exists(),
       });
       
-      if (!senderSnap.exists) {
-        throw new Error(`Sender user document not found: ${senderId}`);
-      }
-      if (!receiverSnap.exists) {
-        throw new Error(`Receiver user document not found: ${receiverId}`);
-      }
+      if (!senderSnap.exists()) throw new Error(`Sender user document not found: ${senderId}`);
+      if (!receiverSnap.exists()) throw new Error(`Receiver user document not found: ${receiverId}`);
       
-      const senderFriends: string[] = (senderSnap.data()?.friends || []) as string[];
-      console.log('🔍 Sender friends list:', senderFriends);
-      
-      if (!senderFriends.includes(receiverId)) {
-        throw new Error('You can only chat after the receiver accepts your request.');
-      }
+      const senderFriends: string[] = senderSnap.data()?.friends || [];
+      if (!senderFriends.includes(receiverId)) throw new Error('You can only chat after the receiver accepts your request.');
     } catch (error) {
       console.error('❌ Error checking user friendship:', error);
       throw error;
@@ -394,62 +326,68 @@ export const ChatService = {
     console.log('🔍 References created');
 
     try {
-      // Create message data
       const messageData: any = {
-        senderId: senderId,
-        receiverId: receiverId,
-        message: message,
-        type: 'text',
-        status: 'sent',
+        senderId,
+        receiverId,
         timestamp: serverTimestamp(),
-        chatId: chatId,
+        chatId,
+        status: 'sent',
       };
 
-      // Add reply data if replying to a message
+      if (media) {
+        messageData.mediaUrl = media.mediaUrl;
+        messageData.mediaType = media.mediaType;
+        messageData.fileName = media.fileName || `${media.mediaType}_${newMessageRef.id}`;
+        messageData.text = ""; // Empty text for media messages
+        messageData.type = media.mediaType; // Set type to image, video, or audio
+      } else {
+        messageData.text = message || "";
+        messageData.type = 'text';
+      }
+
       if (replyTo) {
         messageData.replyTo = {
-          messageId: replyTo.id,
+          messageId: replyTo.messageId,
           text: replyTo.text,
-          senderName: replyTo.sender === 'user' ? 'You' : 'Friend', // You can enhance this with actual names
+          senderId: replyTo.senderId,
+          senderName: replyTo.senderName,
         };
       }
 
-      // Create the message document
-      console.log('🔍 Creating message document...');
+      console.log('🔍 Creating message document with data:', messageData);
       await setDoc(newMessageRef, messageData);
-      console.log('✅ Message document created successfully');
+      console.log('✅ Message document created successfully:', newMessageRef.id);
       
-      // Now update or create the chat document
       const chatSnap = await getDoc(chatRef);
+      let lastMessage: string;
+      if (media) {
+        if (media.mediaType === 'image') lastMessage = '📷 Image';
+        else if (media.mediaType === 'video') lastMessage = '🎥 Video';
+        else if (media.mediaType === 'audio') lastMessage = '🎙️ Audio';
+        else lastMessage = 'Media';
+      } else {
+        lastMessage = message || '';
+      }
       
       if (!chatSnap.exists()) {
         console.log('🔍 Creating new chat document...');
-        
         const chatData = {
           participants: [senderId, receiverId].sort(),
-          lastMessage: message,
+          lastMessage,
           lastMessageTime: serverTimestamp(),
           lastMessageSender: senderId,
           lastMessageId: newMessageRef.id,
-          unreadCount: {
-            [senderId]: 0,
-            [receiverId]: 1
-          },
+          unreadCount: { [senderId]: 0, [receiverId]: 1 },
           createdBy: senderId,
           createdAt: serverTimestamp(),
         };
-        
-        console.log('🔍 Chat data to create:', JSON.stringify(chatData, null, 2));
         await setDoc(chatRef, chatData);
         console.log('✅ Chat document created successfully');
       } else {
         console.log('🔍 Updating existing chat document...');
-        
-        const existingData = chatSnap.data() || {};
-        const currentUnreadCount = existingData.unreadCount || {};
-        
+        const currentUnreadCount = chatSnap.data()?.unreadCount || {};
         await updateDoc(chatRef, {
-          lastMessage: message,
+          lastMessage,
           lastMessageTime: serverTimestamp(),
           lastMessageSender: senderId,
           lastMessageId: newMessageRef.id,
@@ -457,7 +395,8 @@ export const ChatService = {
         });
         console.log('✅ Chat document updated successfully');
       }
-      
+
+      return newMessageRef.id; // Return the new message ID
     } catch (error) {
       console.error('❌ Error in sendMessageWithReply:', error);
       console.error('❌ Error details:', {
@@ -466,7 +405,8 @@ export const ChatService = {
         message,
         chatId,
         replyTo,
-        error: error instanceof Error ? error.message : error
+        media,
+        error: error instanceof Error ? error.message : error,
       });
       throw error;
     }
@@ -475,37 +415,44 @@ export const ChatService = {
   async deleteMessage(chatId: string, messageId: string): Promise<void> {
     try {
       console.log('🗑️ Deleting message:', { chatId, messageId });
-      
       const messageRef = doc(getFirestore(), CHATS, chatId, MESSAGES, messageId);
-      
-      // Check if message exists and belongs to the user
       const messageDoc = await getDoc(messageRef);
-      if (!messageDoc.exists()) {
-        throw new Error('Message not found');
-      }
-      
-      // Delete the message
+      if (!messageDoc.exists()) throw new Error('Message not found');
       await deleteDoc(messageRef);
-      
       console.log('✅ Message deleted successfully');
       
-      // Update last message in chat if this was the last message
       const db = getFirestore();
-    const chatRef = doc(db, CHATS, chatId);
+      const chatRef = doc(db, CHATS, chatId);
       const remainingMessagesQuery = query(
         collection(db, CHATS, chatId, MESSAGES),
         orderBy('timestamp', 'desc'),
         limit(1)
       );
-      
       const remainingMessagesSnap = await getDocs(remainingMessagesQuery);
       
       if (remainingMessagesSnap.empty) {
-        // No messages left, reset chat
         await updateDoc(chatRef, {
           lastMessage: '',
           lastMessageTime: serverTimestamp(),
           lastMessageSender: '',
+        });
+      } else {
+        const lastMessageDoc = remainingMessagesSnap.docs[0];
+        const lastMessageData = lastMessageDoc.data();
+        let lastMessage: string;
+        if (lastMessageData.mediaType) {
+          if (lastMessageData.mediaType === 'image') lastMessage = '📷 Image';
+          else if (lastMessageData.mediaType === 'video') lastMessage = '🎥 Video';
+          else if (lastMessageData.mediaType === 'audio') lastMessage = '🎙️ Audio';
+          else lastMessage = 'Media';
+        } else {
+          lastMessage = lastMessageData.text || '';
+        }
+        await updateDoc(chatRef, {
+          lastMessage,
+          lastMessageTime: lastMessageData.timestamp || serverTimestamp(),
+          lastMessageSender: lastMessageData.senderId || '',
+          lastMessageId: lastMessageDoc.id,
         });
       }
     } catch (error) {
@@ -514,23 +461,14 @@ export const ChatService = {
     }
   },
 
-  // Delete entire chat
-  deleteChat: async (chatId: string): Promise<void> => {
+  async deleteChat(chatId: string): Promise<void> {
     try {
       const batch = writeBatch(getFirestore());
-      
-      // Delete all messages in the chat
-      const messagesRef = collection(getFirestore(), 'chats', chatId, 'messages');
+      const messagesRef = collection(getFirestore(), CHATS, chatId, MESSAGES);
       const messagesSnapshot = await getDocs(messagesRef);
-      
-      messagesSnapshot.docs.forEach((docSnap: any) => {
-        batch.delete(docSnap.ref);
-      });
-      
-      // Delete the chat document itself
-      const chatRef = doc(getFirestore(), 'chats', chatId);
+      messagesSnapshot.docs.forEach((docSnap: any) => batch.delete(docSnap.ref));
+      const chatRef = doc(getFirestore(), CHATS, chatId);
       batch.delete(chatRef);
-      
       await batch.commit();
     } catch (error) {
       console.error('Error deleting chat:', error);
@@ -538,23 +476,21 @@ export const ChatService = {
     }
   },
 
-  // Edit a message
-  editMessage: async (chatId: string, messageId: string, newMessage: string): Promise<void> => {
+  async editMessage(chatId: string, messageId: string, newMessage: string): Promise<void> {
     try {
-      const messageRef = doc(getFirestore(), 'chats', chatId, 'messages', messageId);
+      const messageRef = doc(getFirestore(), CHATS, chatId, MESSAGES, messageId);
       await updateDoc(messageRef, {
-        message: newMessage,
+        text: newMessage, // Use 'text' to match messageData structure
         edited: true,
         editedAt: serverTimestamp(),
       });
       
-      // Update the chat document's lastMessage if this was the most recent message
-      const messagesRef = collection(getFirestore(), 'chats', chatId, 'messages');
+      const messagesRef = collection(getFirestore(), CHATS, chatId, MESSAGES);
       const lastMessageQuery = query(messagesRef, orderBy('timestamp', 'desc'), limit(1));
       const lastMessageSnapshot = await getDocs(lastMessageQuery);
       
       if (!lastMessageSnapshot.empty && lastMessageSnapshot.docs[0].id === messageId) {
-        const chatRef = doc(getFirestore(), 'chats', chatId);
+        const chatRef = doc(getFirestore(), CHATS, chatId);
         await updateDoc(chatRef, {
           lastMessage: newMessage,
           lastMessageId: messageId,
@@ -566,45 +502,84 @@ export const ChatService = {
     }
   },
 
-  // Forward message to multiple users
-  forwardMessage: async (message: any, userIds: string[], senderId: string): Promise<void> => {
+  async forwardMessage(message: any, userIds: string[], senderId: string): Promise<void> {
     try {
+      console.log('🔍 Forwarding message:', {
+        messageId: message.id,
+        text: message.text || '',
+        mediaUrl: message.mediaUrl,
+        mediaType: message.mediaType,
+        fileName: message.fileName,
+        senderId,
+        userIds,
+      });
+  
       const forwardPromises = userIds.map(async (receiverId) => {
         const chatId = ChatService.generateChatId(senderId, receiverId);
-        const messagesRef = collection(getFirestore(), 'chats', chatId, 'messages');
+        await ChatService.ensureChatExists(senderId, receiverId);
+        const messagesRef = collection(getFirestore(), CHATS, chatId, MESSAGES);
         const messageRef = doc(messagesRef);
-
-        const forwardedMessage = {
+  
+        const forwardedMessage: any = {
           id: messageRef.id,
-          message: message.message || message.text || '',
+          text: message.text || '',
           senderId,
           receiverId,
           timestamp: serverTimestamp(),
           status: 'sent',
-          type: 'text',
           chatId,
           forwarded: true,
           originalMessageId: message.id,
         };
-
+  
+        if (message.mediaUrl) {
+          forwardedMessage.mediaUrl = message.mediaUrl;
+          forwardedMessage.mediaType = message.mediaType || 'text';
+          forwardedMessage.fileName = message.fileName || `${message.mediaType}_${messageRef.id}`;
+          forwardedMessage.type = message.mediaType; // Set type to image, video, or audio
+        } else {
+          forwardedMessage.type = 'text';
+        }
+  
+        if (message.replyTo) {
+          forwardedMessage.replyTo = {
+            messageId: message.replyTo.messageId,
+            text: message.replyTo.text,
+            senderId: message.replyTo.senderId,
+            senderName: message.replyTo.senderName,
+          };
+        }
+  
+        console.log('🔍 Creating forwarded message document:', forwardedMessage);
         await setDoc(messageRef, forwardedMessage);
-
-        // Update or create chat document
-        const chatRef = doc(getFirestore(), 'chats', chatId);
+  
+        const chatRef = doc(getFirestore(), CHATS, chatId);
         const chatDoc = await getDoc(chatRef);
-
+  
+        let lastMessage: string;
+        if (message.mediaUrl) {
+          if (message.mediaType === 'image') lastMessage = '📷 Image';
+          else if (message.mediaType === 'video') lastMessage = '🎥 Video';
+          else if (message.mediaType === 'audio') lastMessage = '🎙️ Audio';
+          else lastMessage = 'Media';
+        } else {
+          lastMessage = message.text || '';
+        }
+  
         if (chatDoc.exists()) {
+          console.log('🔍 Updating existing chat document:', chatId);
           await updateDoc(chatRef, {
-            lastMessage: forwardedMessage.message,
+            lastMessage,
             lastMessageTime: serverTimestamp(),
             lastMessageSender: senderId,
             lastMessageId: messageRef.id,
             [`unreadCount.${receiverId}`]: increment(1),
           });
         } else {
+          console.log('🔍 Creating new chat document:', chatId);
           const chatData = {
             participants: [senderId, receiverId].sort(),
-            lastMessage: forwardedMessage.message,
+            lastMessage,
             lastMessageTime: serverTimestamp(),
             lastMessageSender: senderId,
             lastMessageId: messageRef.id,
@@ -615,15 +590,14 @@ export const ChatService = {
           await setDoc(chatRef, chatData);
         }
       });
-
+  
       await Promise.all(forwardPromises);
+      console.log('✅ Message forwarded successfully to:', userIds);
     } catch (error) {
-      console.error('Error forwarding message:', error);
+      console.error('❌ Error forwarding message:', error);
       throw error;
     }
   },
 };
 
 export type { Chat, ChatMessage };
-
-

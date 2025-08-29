@@ -4,11 +4,10 @@ import { configureGoogleSignIn, signInWithGoogle, signOutGoogle } from '@/compon
 import { getText } from '@/components/texts';
 import { useThemeContext } from '@/components/ThemeContext';
 import { useUser } from '@/components/UserContext';
-import { UserService } from '@/services/userService';
-import { UserServiceSimple } from '@/services/userServiceSimple';
 import { ChatService } from '@/services/chatService';
+import { UserServiceSimple } from '@/services/userServiceSimple';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFirestore, doc, setDoc } from '@react-native-firebase/firestore';
+import { doc, getFirestore, setDoc } from '@react-native-firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -137,8 +136,70 @@ export const LoginScreen: React.FC = () => {
         {getText('signInTitle')}
       </CustomText>
       {loading ? (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: theme.colors.inputBackground + 'CC', justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+        <View style={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          backgroundColor: 'rgba(0, 0, 0, 0.7)', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <View style={{
+            backgroundColor: theme.colors.surface || theme.colors.inputBackground,
+            borderRadius: 20,
+            padding: 30,
+            alignItems: 'center',
+            minWidth: 200,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.25,
+            shadowRadius: 20,
+            elevation: 10,
+          }}>
+            <View style={{
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              borderWidth: 3,
+              borderColor: theme.colors.primary + '30',
+              borderTopColor: theme.colors.primary,
+              marginBottom: 20,
+            }} />
+            <View style={{
+              width: 20,
+              height: 20,
+              backgroundColor: '#4285F4',
+              borderRadius: 10,
+              marginBottom: 15,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              <CustomText color="white" fontSize={10} fontWeight="bold">G</CustomText>
+            </View>
+            <CustomText
+              fontSize={theme.fonts.sizes.regular}
+              color={theme.colors.text}
+              fontWeight="500"
+              style={{ textAlign: 'center', marginBottom: 8 }}
+            >
+              Signing you in...
+            </CustomText>
+            <CustomText
+              fontSize={theme.fonts.sizes.small}
+              color={theme.colors.secondaryText}
+              style={{ textAlign: 'center' }}
+            >
+              Please wait a moment
+            </CustomText>
+            <ActivityIndicator 
+              size="small" 
+              color={theme.colors.primary} 
+              style={{ marginTop: 15 }}
+            />
+          </View>
         </View>
       ) : (
         <>
