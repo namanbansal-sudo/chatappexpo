@@ -10,19 +10,21 @@
     "newArchEnabled": true,
     "android": {
       "googleServicesFile": "./google-services.json",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
       "edgeToEdgeEnabled": true,
       "package": "com.naman_bitcot.chatappexpo",
-      "permissions": ["RECORD_AUDIO"]
+      "permissions": [
+        "RECORD_AUDIO",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE"
+      ]
     },
     "ios": {
       "bundleIdentifier": "com.naman-bitcot.chatappexpo",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "This app needs access to your microphone to send voice messages."
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone to send voice messages.",
+        "NSPhotoLibraryUsageDescription": "Allow chatsupp to access your photos to save images and videos.",
+        "NSPhotoLibraryAddUsageDescription": "Allow chatsupp to save photos and videos to your gallery."
       }
     },
     "web": {
@@ -39,6 +41,13 @@
         "expo-audio",
         {
           "microphonePermission": "Allow chatsupp to access your microphone for recording voice notes."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow chatsupp to access your photos to save images and videos.",
+          "savePhotosPermission": "Allow chatsupp to save photos and videos to your gallery."
         }
       ]
     ],

@@ -2,27 +2,9 @@ import { useLanguage } from '@/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
 import { Alert, Dimensions, Modal, TouchableOpacity, View } from 'react-native';
+import type { Message } from './ChatRoom';
 import { CustomText } from './customText';
 import { useThemeContext } from './ThemeContext';
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'other';
-  time: string;
-  timestamp: Date;
-  replyTo?: {
-    messageId: string;
-    text: string;
-    senderId: string;
-    senderName: string;
-  };
-  edited?: boolean;
-  mediaUrl?: string;
-  mediaType?: 'image' | 'video';
-  fileName?: string;
-  isUploading?: boolean;
-}
 
 interface MessageContextMenuProps {
   visible: boolean;
@@ -33,7 +15,7 @@ interface MessageContextMenuProps {
   onForward: (message: Message) => void;
   onCopy: (message: Message) => void;
   onDownload: (message: Message) => void;
-  position: { x: number; y: number };
+  position: { x: number; y: number } | undefined; // Allow undefined
   isOwnMessage: boolean;
 }
 
@@ -46,7 +28,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   onForward,
   onCopy,
   onDownload,
-  position,
+  position = { x: 0, y: 0 }, // Fallback to { x: 0, y: 0 }
   isOwnMessage,
 }) => {
   const { theme } = useThemeContext();
@@ -60,8 +42,8 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   const menuHeight = menuItemCount * 44 + 16; // Approximate
 
   const smartPosition = useMemo(() => {
-    let x = position.x;
-    let y = position.y;
+    let x = position.x ?? 0;
+    let y = position.y ?? 0;
 
     if (x + menuWidth > screenWidth - 20) {
       x = screenWidth - menuWidth - 20;
@@ -71,17 +53,17 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     }
 
     if (y + menuHeight > screenHeight - 100) {
-      y = position.y - menuHeight - 20;
+      y = y - menuHeight - 20;
     }
     if (y < 100) {
       y = 100;
     }
 
     return { x, y };
-  }, [position.x, position.y, screenWidth, screenHeight, menuWidth, menuHeight, isOwnMessage, message?.mediaUrl]);
+  }, [position, screenWidth, screenHeight, menuWidth, menuHeight, isOwnMessage, message?.mediaUrl]);
 
   const handleCopy = async () => {
-    await onCopy(message);
+    await onCopy(message!);
     onClose();
   };
 
@@ -105,18 +87,18 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
 
   const handleEdit = () => {
     console.log('Edit option pressed for message:', { id: message?.id, text: message?.text, mediaUrl: message?.mediaUrl, isOwnMessage });
-    onEdit(message);
+    onEdit(message!);
     onClose();
   };
 
   const handleForward = () => {
-    onForward(message);
+    onForward(message!);
     onClose();
   };
 
   const handleDownload = () => {
     console.log('Download option pressed for message:', { id: message?.id, mediaUrl: message?.mediaUrl });
-    onDownload(message);
+    onDownload(message!);
     onClose();
   };
 
@@ -140,27 +122,27 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     },
     {
       icon: 'download-outline',
-      title: t('Download'),
+      title: t('chat.download'),
       onPress: handleDownload,
-      show: !!message.mediaUrl,
+      show: !!message.mediaUrl && ['image', 'video', 'audio'].includes(message.mediaType || ''), // Show for media
     },
     {
       icon: 'share-outline',
       title: t('chat.forwardMessage'),
       onPress: handleForward,
-      show: true,
+      show: true, // Always show
     },
     {
       icon: 'create-outline',
       title: t('chat.editMessage'),
       onPress: handleEdit,
-      show: isOwnMessage && !message.isUploading, // Show for all own messages, including media to add text
+      show: isOwnMessage && !message.isUploading, // Show for all own messages
     },
     {
       icon: 'trash-outline',
       title: t('chat.deleteMessage'),
       onPress: handleDelete,
-      show: isOwnMessage && !message.isUploading,
+      show: isOwnMessage && !message.isUploading, // Show for all own messages
     },
   ];
 
@@ -206,6 +188,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
                   borderRadius: 8,
                 }}
                 onPress={item.onPress}
+                accessibilityLabel={item.title}
               >
                 <Ionicons
                   name={item.icon as any}

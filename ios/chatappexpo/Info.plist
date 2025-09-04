@@ -62,9 +62,9 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow chatsupp to access your microphone for recording voice notes.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to save photos</string>
+    <string>Allow chatsupp to save photos and videos to your gallery.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your photos</string>
+    <string>Allow chatsupp to access your photos to save images and videos.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

@@ -284,29 +284,6 @@ export default function ChatScreen() {
         </View>
       )}
 
-      {/* ✅ Add Friend Button */}
-      <TouchableOpacity
-        onPress={() => setShowAddFriendPopup(true)}
-        style={{
-          position: 'absolute',
-          bottom: 80,
-          right: 20,
-          backgroundColor: theme.colors.primary,
-          borderRadius: 30,
-          width: 60,
-          height: 60,
-          justifyContent: 'center',
-          alignItems: 'center',
-          elevation: 5,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.25,
-          shadowRadius: 3.84,
-        }}
-      >
-        <Ionicons name="person-add" size={24} color={theme.colors.background} />
-      </TouchableOpacity>
-
       {/* ✅ Add Friend Popup */}
       <AddFriendPopup
         visible={showAddFriendPopup}

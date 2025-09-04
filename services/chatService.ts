@@ -171,71 +171,7 @@ export const ChatService = {
     return chatId;
   },
 
-  async sendMessage(senderId: string, receiverId: string, message: string): Promise<void> {
-    console.log('🔍 Starting sendMessage:', { senderId, receiverId, message });
-    
-    const db = getFirestore();
-    
-    try {
-      const senderDocRef = doc(db, 'users', senderId);
-      const receiverDocRef = doc(db, 'users', receiverId);
-      const [senderSnap, receiverSnap] = await Promise.all([getDoc(senderDocRef), getDoc(receiverDocRef)]);
-      
-      if (!senderSnap.exists()) throw new Error(`Sender user document not found: ${senderId}`);
-      if (!receiverSnap.exists()) throw new Error(`Receiver user document not found: ${receiverId}`);
-      
-      const senderFriends: string[] = senderSnap.data()?.friends || [];
-      if (!senderFriends.includes(receiverId)) throw new Error('You can only chat after the receiver accepts your request.');
-    } catch (error) {
-      console.error('❌ Error checking user friendship:', error);
-      throw error;
-    }
-
-    const chatId = this.generateChatId(senderId, receiverId);
-    const chatRef = doc(db, CHATS, chatId);
-    const messagesRef = collection(db, CHATS, chatId, MESSAGES);
-    const newMessageRef = doc(messagesRef);
-    
-    try {
-      await setDoc(newMessageRef, {
-        senderId,
-        receiverId,
-        message,
-        type: 'text',
-        status: 'sent',
-        timestamp: serverTimestamp(),
-        chatId,
-      });
-      
-      const chatSnap = await getDoc(chatRef);
-      if (!chatSnap.exists()) {
-        const chatData = {
-          participants: [senderId, receiverId].sort(),
-          lastMessage: message,
-          lastMessageTime: serverTimestamp(),
-          lastMessageSender: senderId,
-          lastMessageId: newMessageRef.id,
-          unreadCount: { [senderId]: 0, [receiverId]: 1 },
-          createdBy: senderId,
-          createdAt: serverTimestamp(),
-        };
-        await setDoc(chatRef, chatData);
-      } else {
-        const currentUnreadCount = chatSnap.data()?.unreadCount || {};
-        await updateDoc(chatRef, {
-          lastMessage: message,
-          lastMessageTime: serverTimestamp(),
-          lastMessageSender: senderId,
-          lastMessageId: newMessageRef.id,
-          [`unreadCount.${receiverId}`]: (currentUnreadCount[receiverId] || 0) + 1,
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error in sendMessage:', error);
-      throw error;
-    }
-  },
-
+  
   async markMessagesAsRead(chatId: string, userId: string): Promise<void> {
     const db = getFirestore();
     const chatRef = doc(db, CHATS, chatId);
@@ -293,39 +229,92 @@ export const ChatService = {
     media?: { mediaUrl: string; mediaType: "image" | "video" | "audio"; fileName?: string }
   ): Promise<string> {
     console.log('🔍 sendMessageWithReply called with:', { senderId, receiverId, message, replyTo, media });
-    
+  
+    // Validate input parameters
+    if (!senderId || !receiverId) {
+      console.error('❌ Invalid input: senderId or receiverId is missing', { senderId, receiverId });
+      throw new Error('Sender ID and Receiver ID are required');
+    }
+    if (!message && !media) {
+      console.error('❌ Invalid input: message or media must be provided', { message, media });
+      throw new Error('Message or media content is required');
+    }
+  
+    // Validate replyTo object
+    if (replyTo) {
+      console.log('🔍 Validating replyTo:', replyTo);
+      if (
+        !replyTo.messageId ||
+        !replyTo.senderId ||
+        !replyTo.senderName ||
+        typeof replyTo.text !== 'string'
+      ) {
+        console.error('❌ Invalid replyTo object:', replyTo);
+        throw new Error('Invalid replyTo object: messageId, senderId, senderName, and text are required');
+      }
+    }
+  
+    // Validate users and friendship
     try {
+      const db = getFirestore();
       const [senderSnap, receiverSnap] = await Promise.all([
-        getDoc(doc(getFirestore(), USERS, senderId)),
-        getDoc(doc(getFirestore(), USERS, receiverId)),
+        getDoc(doc(db, "users", senderId)),
+        getDoc(doc(db, "users", receiverId)),
       ]);
-      
-      console.log('🔍 User documents exist:', { 
-        senderExists: senderSnap.exists(), 
+  
+      console.log('🔍 User documents:', {
+        senderExists: senderSnap.exists(),
         receiverExists: receiverSnap.exists(),
       });
-      
-      if (!senderSnap.exists()) throw new Error(`Sender user document not found: ${senderId}`);
-      if (!receiverSnap.exists()) throw new Error(`Receiver user document not found: ${receiverId}`);
-      
+  
+      if (!senderSnap.exists()) {
+        console.error('❌ Sender document not found:', senderId);
+        throw new Error(`Sender user document not found: ${senderId}`);
+      }
+      if (!receiverSnap.exists()) {
+        console.error('❌ Receiver document not found:', receiverId);
+        throw new Error(`Receiver user document not found: ${receiverId}`);
+      }
+  
       const senderFriends: string[] = senderSnap.data()?.friends || [];
-      if (!senderFriends.includes(receiverId)) throw new Error('You can only chat after the receiver accepts your request.');
+      if (!senderFriends.includes(receiverId)) {
+        console.error('❌ Friendship check failed:', { senderId, receiverId, senderFriends });
+        throw new Error('You can only chat after the receiver accepts your request.');
+      }
     } catch (error) {
       console.error('❌ Error checking user friendship:', error);
       throw error;
     }
-
+  
+    // Generate chatId and set up Firestore references
     const chatId = this.generateChatId(senderId, receiverId);
     console.log('🔍 Generated chatId:', chatId);
-    
+  
     const db = getFirestore();
-    const chatRef = doc(db, CHATS, chatId);
-    const messagesRef = collection(db, CHATS, chatId, MESSAGES);
+    const chatRef = doc(db, "chats", chatId);
+    const messagesRef = collection(db, "chats", chatId, "messages");
     const newMessageRef = doc(messagesRef);
-    
-    console.log('🔍 References created');
-
+  
+    console.log('🔍 Firestore references created:', { chatId, newMessageId: newMessageRef.id });
+  
+    // Validate replyTo message existence if provided
+    if (replyTo) {
+      try {
+        const replyMessageRef = doc(db, "chats", chatId, "messages", replyTo.messageId);
+        const replyMessageSnap = await getDoc(replyMessageRef);
+        if (!replyMessageSnap.exists()) {
+          console.error('❌ Reply message not found:', replyTo.messageId);
+          throw new Error(`Reply message not found: ${replyTo.messageId}`);
+        }
+        console.log('✅ Reply message validated:', replyTo.messageId);
+      } catch (error) {
+        console.error('❌ Error validating replyTo message:', error);
+        throw error;
+      }
+    }
+  
     try {
+      // Prepare message data
       const messageData: any = {
         senderId,
         receiverId,
@@ -333,31 +322,34 @@ export const ChatService = {
         chatId,
         status: 'sent',
       };
-
+  
       if (media) {
+        console.log('🔍 Adding media to message:', media);
         messageData.mediaUrl = media.mediaUrl;
         messageData.mediaType = media.mediaType;
         messageData.fileName = media.fileName || `${media.mediaType}_${newMessageRef.id}`;
-        messageData.text = ""; // Empty text for media messages
-        messageData.type = media.mediaType; // Set type to image, video, or audio
+        messageData.text = "";
+        messageData.type = media.mediaType;
       } else {
         messageData.text = message || "";
         messageData.type = 'text';
       }
-
+  
       if (replyTo) {
+        console.log('🔍 Adding replyTo to message:', replyTo);
         messageData.replyTo = {
           messageId: replyTo.messageId,
-          text: replyTo.text,
-          senderId: replyTo.senderId,
-          senderName: replyTo.senderName,
+          text: replyTo.text ?? "",
+          senderId: replyTo.senderId ?? "",
+          senderName: replyTo.senderName ?? "",
         };
       }
-
+  
       console.log('🔍 Creating message document with data:', messageData);
       await setDoc(newMessageRef, messageData);
       console.log('✅ Message document created successfully:', newMessageRef.id);
-      
+  
+      // Update or create chat document
       const chatSnap = await getDoc(chatRef);
       let lastMessage: string;
       if (media) {
@@ -368,7 +360,7 @@ export const ChatService = {
       } else {
         lastMessage = message || '';
       }
-      
+  
       if (!chatSnap.exists()) {
         console.log('🔍 Creating new chat document...');
         const chatData = {
@@ -395,8 +387,8 @@ export const ChatService = {
         });
         console.log('✅ Chat document updated successfully');
       }
-
-      return newMessageRef.id; // Return the new message ID
+  
+      return newMessageRef.id;
     } catch (error) {
       console.error('❌ Error in sendMessageWithReply:', error);
       console.error('❌ Error details:', {
