@@ -2536,11 +2536,6 @@ function ChatRoom() {
         user={friendProfile}
         loading={profileLoading}
       />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? IOS_HEADER_OFFSET : 0}
-      >
         <SafeAreaView
           style={{ flex: 1, backgroundColor: theme.colors.background }}
           edges={["top", "bottom", "left", "right"]}
@@ -3169,7 +3164,7 @@ function ChatRoom() {
             </Modal>
           </View>
         </SafeAreaView>
-      </KeyboardAvoidingView>
+      {/* </KeyboardAvoidingView> */}
     </GestureHandlerRootView>
   );
 }

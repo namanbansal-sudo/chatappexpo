@@ -64,7 +64,9 @@ export function ShowProfilePopup({
                   }}
                   style={styles.avatar}
                 />
-                <CustomText
+
+                <View style={styles.infoContainer}>
+                                  <CustomText
                   fontSize={theme.fonts.sizes.title}
                   color={theme.colors.text}
                   fontWeight="600"
@@ -72,8 +74,6 @@ export function ShowProfilePopup({
                 >
                   {user.name || t("common.unknownUser")}
                 </CustomText>
-
-                <View style={styles.infoContainer}>
                   <View style={styles.detailRow}>
                     <Ionicons
                       name="mail-outline"
