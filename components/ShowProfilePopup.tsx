@@ -16,7 +16,12 @@ interface ShowProfilePopupProps {
   loading?: boolean;
 }
 
-export function ShowProfilePopup({ visible, onClose, user, loading }: ShowProfilePopupProps) {
+export function ShowProfilePopup({
+  visible,
+  onClose,
+  user,
+  loading,
+}: ShowProfilePopupProps) {
   const { theme } = useThemeContext();
   const { t } = useLanguage();
 
@@ -38,10 +43,7 @@ export function ShowProfilePopup({ visible, onClose, user, loading }: ShowProfil
             { backgroundColor: theme.colors.background },
           ]}
         >
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={onClose}
-          >
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Ionicons name="close" size={24} color={theme.colors.text} />
           </TouchableOpacity>
 
@@ -57,27 +59,26 @@ export function ShowProfilePopup({ visible, onClose, user, loading }: ShowProfil
             ) : user ? (
               <>
                 <Image
-                  source={{ 
-                    uri: user.avatar || "https://via.placeholder.com/100" 
+                  source={{
+                    uri: user.avatar || "https://via.placeholder.com/100",
                   }}
                   style={styles.avatar}
                 />
-                
-                <View style={styles.infoContainer}>
-                  <CustomText
-                    fontSize={theme.fonts.sizes.title}
-                    color={theme.colors.text}
-                    fontWeight="600"
-                    style={styles.text}
-                  >
-                    {user.name || t("common.unknownUser")}
-                  </CustomText>
+                <CustomText
+                  fontSize={theme.fonts.sizes.title}
+                  color={theme.colors.text}
+                  fontWeight="600"
+                  style={styles.text}
+                >
+                  {user.name || t("common.unknownUser")}
+                </CustomText>
 
+                <View style={styles.infoContainer}>
                   <View style={styles.detailRow}>
-                    <Ionicons 
-                      name="mail-outline" 
-                      size={20} 
-                      color={theme.colors.secondaryText} 
+                    <Ionicons
+                      name="mail-outline"
+                      size={20}
+                      color={theme.colors.secondaryText}
                       style={styles.icon}
                     />
                     <CustomText
@@ -90,10 +91,10 @@ export function ShowProfilePopup({ visible, onClose, user, loading }: ShowProfil
                   </View>
 
                   <View style={styles.detailRow}>
-                    <Ionicons 
-                      name="briefcase-outline" 
-                      size={20} 
-                      color={theme.colors.secondaryText} 
+                    <Ionicons
+                      name="briefcase-outline"
+                      size={20}
+                      color={theme.colors.secondaryText}
                       style={styles.icon}
                     />
                     <CustomText
@@ -133,7 +134,9 @@ const styles = StyleSheet.create({
     width: "80%",
     borderRadius: 15,
     padding: 20,
-    minHeight: '35%',
+    minHeight: "35%",
+    justifyContent: "center",
+    alignItems: "center",
   },
   closeButton: {
     position: "absolute",
@@ -153,7 +156,7 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     width: "100%",
-    alignItems: "center",
+    // alignItems: "center",
   },
   detailRow: {
     flexDirection: "row",

@@ -1,25 +1,25 @@
 // app/(tabs)/index.tsx
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  Animated,
+  FlatList,
+  RefreshControl,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AddFriendPopup } from '../../components/AddFriendPopup';
 import { CustomChatItem } from '../../components/customChatItem';
 import { CustomSearchInput } from '../../components/customSearchInput';
 import { CustomText } from '../../components/customText';
 import { useThemeContext } from '../../components/ThemeContext';
-import { useUser } from '../../components/UserContext';
 import { useChatViewModel } from '../../components/useChatViewModel';
+import { useUser } from '../../components/UserContext';
 import { ChatService } from '../../services/chatService';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  FlatList,
-  RefreshControl,
-  TouchableOpacity,
-  View,
-  Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { UserServiceSimple, User } from '../../services/userServiceSimple';
 
 // ✅ Optimized Chat Item Component
 const AnimatedChatItem = React.memo(
@@ -43,7 +43,7 @@ const AnimatedChatItem = React.memo(
             message={item.lastMessage}
             time={item.time}
             unread={item.unreadCount}
-            online={item.isOnline}
+            online={item.isOnline} // This will show real-time status
           />
         </TouchableOpacity>
       </Animated.View>
@@ -71,6 +71,60 @@ export default function ChatScreen() {
   const { user } = useUser();
   const router = useRouter();
   const [showAddFriendPopup, setShowAddFriendPopup] = useState(false);
+  const [onlineStatuses, setOnlineStatuses] = useState<Record<string, boolean>>({});
+  const [userStatusListeners, setUserStatusListeners] = useState<(() => void)[]>([]);
+
+  // ✅ Listen for online status changes of users in chats
+  useEffect(() => {
+    if (!user?.uid || chats.length === 0) return;
+
+    // Clear previous listeners
+    userStatusListeners.forEach(unsubscribe => unsubscribe());
+    
+    const newListeners: (() => void)[] = [];
+    const statusMap: Record<string, boolean> = {};
+
+    // Set up listeners for each chat's friend user
+    chats.forEach(chat => {
+      const chatUserIds = chat.id.split('_');
+      const friendId = chatUserIds.find((id: string) => id !== user.uid);
+      
+      if (friendId) {
+        const unsubscribe = UserServiceSimple.onUserStatusChange(friendId, (userData: User | null) => {
+          if (userData) {
+            setOnlineStatuses(prev => ({
+              ...prev,
+              [friendId]: userData.isOnline || false
+            }));
+          }
+        });
+        
+        newListeners.push(unsubscribe);
+      }
+    });
+
+    setUserStatusListeners(newListeners);
+
+    return () => {
+      newListeners.forEach(unsubscribe => unsubscribe());
+    };
+  }, [user?.uid, chats]);
+
+// ✅ Enhance chats with real-time online status
+const chatsWithOnlineStatus = useMemo(() => {
+  const enhancedChats = chats.map(chat => {
+    const chatUserIds = chat.id.split('_');
+    const friendId = chatUserIds.find((id: string) => id !== user?.uid);
+    const isOnline = friendId ? onlineStatuses[friendId] || false : false;
+    
+    return {
+      ...chat,
+      isOnline: isOnline
+    };
+  });
+  
+  return enhancedChats;
+}, [chats, onlineStatuses, user?.uid]);
 
   // ✅ Delete chat
   const handleChatLongPress = useCallback(
@@ -102,13 +156,13 @@ export default function ChatScreen() {
   // ✅ Filter chats
   const filteredChats = useMemo(
     () =>
-      chats.filter(
+      chatsWithOnlineStatus.filter(
         (chat) =>
           chat.name.toLowerCase().includes(search.toLowerCase()) &&
           (tab === 'allTab' ||
             (tab === 'unreadTab' && (chat.unreadCount ?? 0) > 0))
       ),
-    [chats, search, tab]
+    [chatsWithOnlineStatus, search, tab]
   );
 
   // ✅ Tab change
@@ -148,8 +202,8 @@ export default function ChatScreen() {
         params: {
           name: chat.name,
           avatar: chat.avatar,
-          currentUserId: user?.uid, // ✅ pass logged-in user ID
-          friendUserId, // ✅ pass friend ID
+          currentUserId: user?.uid,
+          friendUserId,
         },
       });
     },

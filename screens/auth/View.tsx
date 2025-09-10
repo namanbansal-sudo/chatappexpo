@@ -24,7 +24,6 @@ export const LoginScreen: React.FC = () => {
 
   useEffect(() => {
     configureGoogleSignIn();
-    // Clear any cached account to force chooser next time
     (async () => {
       try {
         await signOutGoogle();

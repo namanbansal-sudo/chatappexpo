@@ -6,6 +6,7 @@ import {
   getDocs,
   getFirestore,
   limit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -71,13 +72,39 @@ export const UserServiceSimple = {
   async updateOnlineStatus(uid: string, isOnline: boolean): Promise<void> {
     const db = getFirestore();
     const userRef = doc(db, USERS, uid);
-    await setDoc(userRef,
+    await setDoc(
+      userRef,
       {
         isOnline,
         lastSeen: serverTimestamp(),
       },
       { merge: true }
     );
+  },
+
+  // 👇 NEW: Realtime listener
+  onUserStatusChange(uid: string, callback: (user: User | null) => void) {
+    const db = getFirestore();
+    const userRef = doc(db, USERS, uid);
+
+    return onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data() as User);
+      } else {
+        callback(null);
+      }
+    });
+  },
+
+
+  onAllUsersStatusChange(callback: (users: User[]) => void) {
+    const db = getFirestore();
+    const usersRef = collection(db, USERS);
+
+    return onSnapshot(usersRef, (snap) => {
+      const users = snap.docs.map((d) => d.data() as User);
+      callback(users);
+    });
   },
 
   async updateProfileImage(uid: string, photoURL: string): Promise<void> {

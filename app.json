@@ -14,9 +14,13 @@
       "package": "com.naman_bitcot.chatappexpo",
       "permissions": [
         "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "READ_EXTERNAL_STORAGE"
-      ]
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "READ_MEDIA_AUDIO"
+      ],
+      "requestLegacyExternalStorage": true
     },
     "ios": {
       "bundleIdentifier": "com.naman-bitcot.chatappexpo",
@@ -47,7 +51,9 @@
         "expo-media-library",
         {
           "photosPermission": "Allow chatsupp to access your photos to save images and videos.",
-          "savePhotosPermission": "Allow chatsupp to save photos and videos to your gallery."
+          "savePhotosPermission": "Allow chatsupp to save photos and videos to your gallery.",
+          "audioPermission": "Allow chatsupp to access and save audio files for voice notes.",
+          "isAccessMediaLocationEnabled": true
         }
       ]
     ],

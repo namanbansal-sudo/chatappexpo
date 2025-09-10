@@ -15,7 +15,7 @@ interface MessageContextMenuProps {
   onForward: (message: Message) => void;
   onCopy: (message: Message) => void;
   onDownload: (message: Message) => void;
-  position: { x: number; y: number } | undefined; // Allow undefined
+  position: { x: number; y: number } | undefined;
   isOwnMessage: boolean;
 }
 
@@ -28,7 +28,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   onForward,
   onCopy,
   onDownload,
-  position = { x: 0, y: 0 }, // Fallback to { x: 0, y: 0 }
+  position = { x: 0, y: 0 },
   isOwnMessage,
 }) => {
   const { theme } = useThemeContext();
@@ -38,29 +38,49 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
 
   // Calculate smart positioning
   const menuWidth = 150;
-  const menuItemCount = (isOwnMessage ? 2 : 0) + 2 + (message?.mediaUrl ? 1 : 0); // Edit, Delete, Copy, Forward, Download (if media)
-  const menuHeight = menuItemCount * 44 + 16; // Approximate
+  
+  // Check if message has any media (image, video, or audio)
+  const hasMedia = !!message?.mediaUrl && ['image', 'video', 'audio'].includes(message.mediaType || '');
+  
+  // Count menu items that will actually be shown
+  const menuItemCount = [
+    !!message?.text || !!message?.mediaUrl, // Copy
+    hasMedia, // Download
+    true, // Forward
+    isOwnMessage && !!message?.text && !message.isUploading, // Edit (allow media messages with captions)
+    isOwnMessage && !message?.isUploading, // Delete
+  ].filter(Boolean).length;
+  
+  const menuHeight = menuItemCount * 44 + 16;
 
   const smartPosition = useMemo(() => {
     let x = position.x ?? 0;
     let y = position.y ?? 0;
 
+    // Horizontal positioning with better edge detection
     if (x + menuWidth > screenWidth - 20) {
-      x = screenWidth - menuWidth - 20;
+      // If menu would go off right edge, position it to the left of touch point
+      x = Math.max(20, x - menuWidth - 10);
     }
     if (x < 20) {
       x = 20;
     }
 
+    // Vertical positioning with better edge detection
     if (y + menuHeight > screenHeight - 100) {
-      y = y - menuHeight - 20;
+      // If menu would go off bottom edge, position it above touch point
+      y = Math.max(100, y - menuHeight - 20);
     }
     if (y < 100) {
       y = 100;
     }
 
+    // Additional safety check - ensure menu stays within screen bounds
+    x = Math.min(Math.max(x, 20), screenWidth - menuWidth - 20);
+    y = Math.min(Math.max(y, 100), screenHeight - menuHeight - 100);
+
     return { x, y };
-  }, [position, screenWidth, screenHeight, menuWidth, menuHeight, isOwnMessage, message?.mediaUrl]);
+  }, [position, screenWidth, screenHeight, menuWidth, menuHeight]);
 
   const handleCopy = async () => {
     await onCopy(message!);
@@ -86,7 +106,6 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   };
 
   const handleEdit = () => {
-    console.log('Edit option pressed for message:', { id: message?.id, text: message?.text, mediaUrl: message?.mediaUrl, isOwnMessage });
     onEdit(message!);
     onClose();
   };
@@ -97,56 +116,45 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   };
 
   const handleDownload = () => {
-    console.log('Download option pressed for message:', { id: message?.id, mediaUrl: message?.mediaUrl });
     onDownload(message!);
     onClose();
   };
 
   if (!visible || !message) return null;
 
-  console.log('MessageContextMenu rendered with message:', {
-    id: message.id,
-    mediaUrl: message.mediaUrl,
-    mediaType: message.mediaType,
-    hasMedia: !!message.mediaUrl,
-    text: message.text,
-    isOwnMessage,
-  });
-
   const menuItems = [
     {
       icon: 'copy-outline',
       title: t('chat.copyMessage'),
       onPress: handleCopy,
-      show: !!message.text || !!message.mediaUrl, // Show for text or media
+      show: !!message.text || !!message.mediaUrl,
     },
     {
       icon: 'download-outline',
       title: t('chat.download'),
       onPress: handleDownload,
-      show: !!message.mediaUrl && ['image', 'video', 'audio'].includes(message.mediaType || ''), // Show for media
+      show: hasMedia,
     },
     {
       icon: 'share-outline',
       title: t('chat.forwardMessage'),
       onPress: handleForward,
-      show: true, // Always show
+      show: true,
     },
     {
       icon: 'create-outline',
       title: t('chat.editMessage'),
       onPress: handleEdit,
-      show: isOwnMessage && !message.isUploading, // Show for all own messages
+      // Allow editing messages with text content (including media messages with captions)
+      show: isOwnMessage && !!message.text && !message.isUploading,
     },
     {
       icon: 'trash-outline',
       title: t('chat.deleteMessage'),
       onPress: handleDelete,
-      show: isOwnMessage && !message.isUploading, // Show for all own messages
+      show: isOwnMessage && !message.isUploading,
     },
   ];
-
-  console.log('Menu items to render:', menuItems.filter(item => item.show).map(item => item.title));
 
   return (
     <Modal transparent visible={visible} onRequestClose={onClose}>
