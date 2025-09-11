@@ -965,27 +965,19 @@ function ChatRoom() {
     return () => unsubscribe?.();
   }, [user?.uid, friendUserId]);
 
-  useEffect(() => {
-    if (!user?.uid || !friendUserId) return;
-    const chatId = ChatService.generateChatId(user.uid, friendUserId);
-
-    const markAsRead = () => {
-      ChatService.markMessagesAsRead(chatId, user.uid!)
-        .catch(() =>
-          ChatService.markIncomingFromSenderAsRead(
-            chatId,
-            user.uid!,
-            friendUserId!
-          )
-        )
-        .catch(() => {});
-    };
-
-    markAsRead();
-    const interval = setInterval(markAsRead, 2000);
-
-    return () => clearInterval(interval);
-  }, [user?.uid, friendUserId]);
+  // Remove the entire useEffect block above and replace with:
+useEffect(() => {
+  if (!user?.uid || !friendUserId) return;
+  
+  // Only mark as read once on component mount, not repeatedly
+  const chatId = ChatService.generateChatId(user.uid, friendUserId);
+  
+  // Simple one-time mark as read without error handling
+  ChatService.markMessagesAsRead(chatId, user.uid!)
+    .catch(error => {
+      console.log('Mark as read failed (non-critical):', error);
+    });
+}, [user?.uid, friendUserId]);
 
   // Cleanup audio on component unmount
   useEffect(() => {

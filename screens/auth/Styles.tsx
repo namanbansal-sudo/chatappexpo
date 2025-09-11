@@ -37,6 +37,13 @@ const styles = StyleSheet.create({
     marginRight: 10,
     borderRadius: 20,
   },
+  googleIcon2: {
+    width: 34,
+    height: 34,
+    marginRight: 10,
+    borderRadius: 20,
+    marginBottom: 20,
+  },
   googleText: {
     fontSize: theme.fonts.sizes.regular,
   },

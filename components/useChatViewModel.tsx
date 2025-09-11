@@ -57,7 +57,7 @@ export const useChatViewModel = () => {
         const chatsQuery = query(
           chatsRef,
           where("participants", "array-contains", user.uid),
-          orderBy("lastMessageTime", "desc")
+          // orderBy("lastMessageTime", "desc")
         );
 
         const initialSnapshot = await getDocs(chatsQuery);
@@ -81,12 +81,18 @@ export const useChatViewModel = () => {
             }
           }
         );
-      } catch (error) {
-        console.error("Error loading chats:", error);
+      } catch (error: any) {
+        if (error.code === 'permission-denied') {
+          console.log('Firestore permission denied. Please check security rules.');
+          // You might want to show a user-friendly message here
+        } else {
+          console.error('Error loading chats:', error);
+        }
         if (isMounted) {
           setLoading(false);
         }
       }
+    
     };
 
     const processChats = async (firebaseChats: ChatSimple[]) => {

@@ -158,26 +158,10 @@ export const LoginScreen: React.FC = () => {
             shadowRadius: 20,
             elevation: 10,
           }}>
-            <View style={{
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-              borderWidth: 3,
-              borderColor: theme.colors.primary + '30',
-              borderTopColor: theme.colors.primary,
-              marginBottom: 20,
-            }} />
-            <View style={{
-              width: 20,
-              height: 20,
-              backgroundColor: '#4285F4',
-              borderRadius: 10,
-              marginBottom: 15,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
-              <CustomText color="white" fontSize={10} fontWeight="bold">G</CustomText>
-            </View>
+            <Image
+              source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+              style={styles.googleIcon2}
+            />
             <CustomText
               fontSize={theme.fonts.sizes.regular}
               color={theme.colors.text}
