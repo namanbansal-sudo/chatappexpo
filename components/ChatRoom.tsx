@@ -28,7 +28,7 @@ import {
   TextInput,
   ToastAndroid,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -349,7 +349,6 @@ function ChatRoom() {
   const [audioDurations, setAudioDurations] = useState<Record<string, string>>(
     {}
   );
-  const [processingMedia, setProcessingMedia] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
   const recTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -2528,6 +2527,14 @@ useEffect(() => {
         user={friendProfile}
         loading={profileLoading}
       />
+      <KeyboardAvoidingView
+    style={{ flex: 1 }}
+    behavior={Platform.OS === "ios" ? "padding" : "height"}
+    keyboardVerticalOffset={Platform.select({
+      ios: 90,
+      android: 0
+    })}
+  >
         <SafeAreaView
           style={{ flex: 1, backgroundColor: theme.colors.background }}
           edges={["top", "bottom", "left", "right"]}
@@ -2593,6 +2600,10 @@ useEffect(() => {
             style={{ flex: 1 }}
             contentContainerStyle={{ padding: 10, paddingTop: 8 }}
             inverted={true}
+            automaticallyAdjustContentInsets={false}
+            automaticallyAdjustKeyboardInsets={true}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled" // This is important!
             scrollEnabled={true}
             showsVerticalScrollIndicator={false}
             removeClippedSubviews={false}
@@ -3156,6 +3167,7 @@ useEffect(() => {
             </Modal>
           </View>
         </SafeAreaView>
+   </KeyboardAvoidingView>
       {/* </KeyboardAvoidingView> */}
     </GestureHandlerRootView>
   );

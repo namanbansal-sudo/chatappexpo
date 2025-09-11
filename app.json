@@ -11,6 +11,7 @@
     "android": {
       "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "resize",
       "package": "com.naman_bitcot.chatappexpo",
       "permissions": [
         "RECORD_AUDIO",
