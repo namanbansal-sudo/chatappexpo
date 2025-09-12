@@ -28,7 +28,7 @@ import {
   TextInput,
   ToastAndroid,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -965,18 +965,17 @@ function ChatRoom() {
   }, [user?.uid, friendUserId]);
 
   // Remove the entire useEffect block above and replace with:
-useEffect(() => {
-  if (!user?.uid || !friendUserId) return;
-  
-  // Only mark as read once on component mount, not repeatedly
-  const chatId = ChatService.generateChatId(user.uid, friendUserId);
-  
-  // Simple one-time mark as read without error handling
-  ChatService.markMessagesAsRead(chatId, user.uid!)
-    .catch(error => {
-      console.log('Mark as read failed (non-critical):', error);
+  useEffect(() => {
+    if (!user?.uid || !friendUserId) return;
+
+    // Only mark as read once on component mount, not repeatedly
+    const chatId = ChatService.generateChatId(user.uid, friendUserId);
+
+    // Simple one-time mark as read without error handling
+    ChatService.markMessagesAsRead(chatId, user.uid!).catch((error) => {
+      console.log("Mark as read failed (non-critical):", error);
     });
-}, [user?.uid, friendUserId]);
+  }, [user?.uid, friendUserId]);
 
   // Cleanup audio on component unmount
   useEffect(() => {
@@ -2528,13 +2527,13 @@ useEffect(() => {
         loading={profileLoading}
       />
       <KeyboardAvoidingView
-    style={{ flex: 1 }}
-    behavior={Platform.OS === "ios" ? "padding" : "height"}
-    keyboardVerticalOffset={Platform.select({
-      ios: 90,
-      android: 0
-    })}
-  >
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.select({
+          ios: 90,
+          android: 0,
+        })}
+      >
         <SafeAreaView
           style={{ flex: 1, backgroundColor: theme.colors.background }}
           edges={["top", "bottom", "left", "right"]}
@@ -3167,7 +3166,7 @@ useEffect(() => {
             </Modal>
           </View>
         </SafeAreaView>
-   </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
       {/* </KeyboardAvoidingView> */}
     </GestureHandlerRootView>
   );
