@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
 import { Alert, Dimensions, Modal, TouchableOpacity, View } from 'react-native';
 import type { Message } from './ChatRoom';
-import { CustomText } from './customText';
+import { CustomText } from './CustomText';
 import { useThemeContext } from './ThemeContext';
 
 interface MessageContextMenuProps {
@@ -131,7 +131,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     },
     {
       icon: 'download-outline',
-      title: t('chat.download'),
+      title: t('Download'),
       onPress: handleDownload,
       show: hasMedia,
     },

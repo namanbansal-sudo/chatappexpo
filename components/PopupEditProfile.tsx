@@ -1,11 +1,11 @@
 // components/PopupEditProfile.tsx
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Modal } from 'react-native';
-import { CustomText } from '@/components/customText';
+import { CustomButton } from '@/components/CustomButton';
 import { CustomInput } from '@/components/customInput';
-import { CustomButton } from '@/components/customButton';
+import { CustomText } from '@/components/CustomText';
 import { useThemeContext } from '@/components/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 interface PopupEditProfileProps {
   visible: boolean;

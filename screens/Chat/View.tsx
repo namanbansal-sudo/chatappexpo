@@ -3,23 +3,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
-  Animated,
-  FlatList,
-  RefreshControl,
-  TouchableOpacity,
-  View
+    Alert,
+    Animated,
+    FlatList,
+    StatusBar,
+    RefreshControl,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddFriendPopup } from '../../components/AddFriendPopup';
 import { CustomChatItem } from '../../components/customChatItem';
 import { CustomSearchInput } from '../../components/customSearchInput';
-import { CustomText } from '../../components/customText';
+import { CustomText } from '../../components/CustomText';
 import { useThemeContext } from '../../components/ThemeContext';
 import { useChatViewModel } from '../../components/useChatViewModel';
 import { useUser } from '../../components/UserContext';
 import { ChatService } from '../../services/chatService';
-import { UserServiceSimple, User } from '../../services/userServiceSimple';
+import { User, UserServiceSimple } from '../../services/userServiceSimple';
 
 // ✅ Optimized Chat Item Component
 const AnimatedChatItem = React.memo(
@@ -67,12 +68,13 @@ export default function ChatScreen() {
     refreshNow,
   } = useChatViewModel();
 
-  const { theme } = useThemeContext();
+  const { theme, isDark } = useThemeContext();
   const { user } = useUser();
   const router = useRouter();
   const [showAddFriendPopup, setShowAddFriendPopup] = useState(false);
   const [onlineStatuses, setOnlineStatuses] = useState<Record<string, boolean>>({});
   const [userStatusListeners, setUserStatusListeners] = useState<(() => void)[]>([]);
+  const insets = useSafeAreaInsets();
 
   // ✅ Listen for online status changes of users in chats
   useEffect(() => {
@@ -211,7 +213,17 @@ const chatsWithOnlineStatus = useMemo(() => {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <SafeAreaView
+      edges={["left", "right", "bottom"]}
+      style={{ flex: 1, backgroundColor: theme.colors.inputBackground }}
+   >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+      />
+      <View style={{ height: insets.top }} />
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {/* ✅ Search */}
       <CustomSearchInput
         placeholder="Search chats..."
@@ -343,6 +355,7 @@ const chatsWithOnlineStatus = useMemo(() => {
         visible={showAddFriendPopup}
         onClose={() => setShowAddFriendPopup(false)}
       />
-    </SafeAreaView>
-  );
+    </View>
+  </SafeAreaView>
+);
 }

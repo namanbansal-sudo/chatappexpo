@@ -1,15 +1,15 @@
 // app/(tabs)/request.tsx
+import { AddFriendPopup } from '@/components/AddFriendPopup';
 import { CustomRequestItem } from '@/components/customRequestItem';
 import { CustomSearchInput } from '@/components/customSearchInput';
-import { CustomText } from '@/components/customText';
+import { CustomText } from '@/components/CustomText';
 import { useThemeContext } from '@/components/ThemeContext';
-import { useLanguage } from '@/i18n';
 import { useRequestViewModel } from '@/components/useRequestViewModel';
-import { AddFriendPopup } from '@/components/AddFriendPopup';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useLanguage } from '@/i18n';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { FlatList, TouchableOpacity, View, ActivityIndicator, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, FlatList, RefreshControl, TouchableOpacity, View, StatusBar } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function RequestScreen() {
   const { 
@@ -28,14 +28,14 @@ export default function RequestScreen() {
     acceptingId,
     handleRefresh,
   } = useRequestViewModel();
-  const { theme } = useThemeContext();
+  const { theme, isDark } = useThemeContext();
   const { t } = useLanguage();
   const [showAddFriendPopup, setShowAddFriendPopup] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const filteredRequests = requests.filter(req => 
     req.name.toLowerCase().includes(search.toLowerCase())
   );
-  console.log('filteredRequests', filteredRequests)
 
   const isEmpty = requests.length === 0 && !loading;
 
@@ -49,12 +49,34 @@ export default function RequestScreen() {
     />
   );
 
+  // Filter requests based on active tab
+  const getFilteredRequestsByTab = () => {
+    if (activeTab === 'received') {
+      return filteredRequests.filter(req => req.type === 'received');
+    } else {
+      return filteredRequests.filter(req => req.type === 'sent');
+    }
+  };
+
+  const tabFilteredRequests = getFilteredRequestsByTab();
+  const tabIsEmpty = tabFilteredRequests.length === 0 && !loading;
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <CustomSearchInput 
-        placeholder="Search requests..." 
-        value={search} 
-        onChangeText={setSearch} 
+    <SafeAreaView
+      edges={["left", "right", "bottom"]}
+      style={{ flex: 1, backgroundColor: theme.colors.inputBackground }}
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+      />
+      <View style={{ height: insets.top }} />
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <CustomSearchInput
+        placeholder="Search requests..."
+        value={search}
+        onChangeText={setSearch}
       />
       
       {/* Tab Navigation */}
@@ -112,7 +134,7 @@ export default function RequestScreen() {
             Loading requests...
           </CustomText>
         </View>
-      ) : isEmpty ? (
+      ) : tabIsEmpty ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <Ionicons name="people-outline" size={80} color={theme.colors.secondaryText} style={{ marginBottom: 20 }} />
           <CustomText fontSize={theme.fonts.sizes.title} color={theme.colors.text}>
@@ -142,7 +164,7 @@ export default function RequestScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredRequests}
+          data={tabFilteredRequests}
           renderItem={renderRequestItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 120 }}
@@ -167,6 +189,7 @@ export default function RequestScreen() {
         visible={showAddFriendPopup}
         onClose={() => setShowAddFriendPopup(false)}
       />
+      </View>
     </SafeAreaView>
   );
 }

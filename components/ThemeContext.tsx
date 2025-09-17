@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 const lightTheme = {
   colors: {
@@ -66,13 +67,47 @@ export const ThemeContext = createContext({
   isDark: true,
 });
 
-export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isDark, setIsDark] = useState(true);
+export const ThemeProvider = ({ children, initialIsDark }: { children: React.ReactNode, initialIsDark?: boolean }) => {
+  const [isDark, setIsDark] = useState(initialIsDark ?? true);
+  const THEME_STORAGE_KEY = 'user_theme_preference';
+
+  // Load persisted theme preference on mount (skip if initialIsDark provided)
+  useEffect(() => {
+    if (typeof initialIsDark === 'boolean') return;
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+        if (saved === 'dark') {
+          setIsDark(true);
+        } else if (saved === 'light') {
+          setIsDark(false);
+        } else if (saved === 'true' || saved === 'false') {
+          // Backward compatibility if boolean string was stored
+          setIsDark(saved === 'true');
+        }
+      } catch (e) {
+        console.warn('Failed to load theme preference:', e);
+      }
+    })();
+  }, [initialIsDark]);
+
+  // Sync with initialIsDark prop updates (from root loader) to prevent flicker
+  useEffect(() => {
+    if (typeof initialIsDark === 'boolean') {
+      setIsDark(initialIsDark);
+    }
+  }, [initialIsDark]);
   
   const theme = useMemo(() => isDark ? darkTheme : lightTheme, [isDark]);
   
   const toggleTheme = useCallback(() => {
-    setIsDark(prev => !prev);
+    setIsDark(prev => {
+      const next = !prev;
+      AsyncStorage.setItem(THEME_STORAGE_KEY, next ? 'dark' : 'light').catch((e) =>
+        console.warn('Failed to persist theme preference:', e)
+      );
+      return next;
+    });
   }, []);
   
   const value = useMemo(() => ({

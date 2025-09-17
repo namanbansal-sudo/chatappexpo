@@ -626,6 +626,20 @@ async markIncomingFromSenderAsRead(
       throw error;
     }
   },
+
+  // Add this method to update recent chats when messages are sent/received
+async updateRecentChats(userId: string, chatId: string, chatName: string, lastMessage: string): Promise<void> {
+  try {
+    // Add to recent chats for quick actions
+    await addRecentChat({
+      id: chatId,
+      name: chatName,
+      lastMessage
+    });
+  } catch (error) {
+    console.error('Error updating recent chats:', error);
+  }
+},
 };
 
 export type { Chat, ChatMessage };

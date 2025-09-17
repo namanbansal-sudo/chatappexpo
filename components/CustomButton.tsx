@@ -1,17 +1,24 @@
 // components/CustomButton.tsx
 import React, { useMemo } from 'react';
-import { TouchableOpacity, StyleProp, ViewStyle, TextStyle } from 'react-native';
+import { StyleProp, TextStyle, TouchableOpacity, ViewStyle } from 'react-native';
 import { useThemeContext } from './ThemeContext';
-import { CustomText } from './customText';
+import CustomText from './CustomText';
 
 interface CustomButtonProps {
   title: string;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
+  testID?: string;
 }
 
-export const CustomButton: React.FC<CustomButtonProps> = React.memo(({ title, onPress, style, textStyle }) => {
+export const CustomButton: React.FC<CustomButtonProps> = React.memo(({ 
+  title, 
+  onPress, 
+  style, 
+  textStyle,
+  testID = 'custom-button' 
+}) => {
   const { theme } = useThemeContext();
   
   const buttonStyle = useMemo(() => ([
@@ -27,7 +34,11 @@ export const CustomButton: React.FC<CustomButtonProps> = React.memo(({ title, on
   ]), [theme.colors.primary, style]);
   
   return (
-    <TouchableOpacity onPress={onPress} style={buttonStyle}>
+    <TouchableOpacity 
+      testID={testID}
+      onPress={onPress} 
+      style={buttonStyle}
+    >
       <CustomText color={theme.colors.background} fontWeight="bold" style={textStyle}>
         {title}
       </CustomText>

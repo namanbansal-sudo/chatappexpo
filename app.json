@@ -56,7 +56,8 @@
           "audioPermission": "Allow chatsupp to access and save audio files for voice notes.",
           "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "expo-quick-actions"
     ],
     "experiments": {
       "typedRoutes": true

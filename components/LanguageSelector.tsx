@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { View, TouchableOpacity, Modal, FlatList } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { CustomText } from './customText';
-import { useThemeContext } from './ThemeContext';
 import { useLanguage } from '@/i18n';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { FlatList, Modal, TouchableOpacity, View } from 'react-native';
+import { CustomText } from './CustomText';
+import { useThemeContext } from './ThemeContext';
 
 export const LanguageSelector: React.FC = () => {
   const { theme } = useThemeContext();

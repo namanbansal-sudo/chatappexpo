@@ -1,8 +1,8 @@
 // components/CustomInput.tsx
 import React from 'react';
-import { TextInput, TextInputProps, View, StyleProp, ViewStyle, TextStyle } from 'react-native';
+import { StyleProp, TextInput, TextInputProps, TextStyle, View, ViewStyle } from 'react-native';
+import { CustomText } from './CustomText';
 import { useThemeContext } from './ThemeContext';
-import { CustomText } from './customText';
 
 interface CustomInputProps extends TextInputProps {
   label?: string;

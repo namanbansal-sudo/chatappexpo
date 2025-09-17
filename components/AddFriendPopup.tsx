@@ -1,23 +1,23 @@
 // components/AddFriendPopup.tsx
+import { FriendRequestService } from '@/services/friendRequestService';
+import { UserServiceSimple } from '@/services/userServiceSimple';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User } from '../types/models';
-import { CustomText } from './customText';
+import { CustomText } from './CustomText';
 import { useThemeContext } from './ThemeContext';
 import { useUser } from './UserContext';
-import { UserServiceSimple } from '@/services/userServiceSimple';
-import { FriendRequestService } from '@/services/friendRequestService';
 
 interface AddFriendPopupProps {
   visible: boolean;

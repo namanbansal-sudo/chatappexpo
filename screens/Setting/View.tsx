@@ -1,5 +1,5 @@
 import { useNavigateToLogin } from "@/app/(services)/navigationService";
-import { CustomText } from "@/components/customText";
+import { CustomText } from "@/components/CustomText";
 import { signOutGoogle } from "@/components/googleSignIn";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { PopupEditProfile } from "@/components/PopupEditProfile";
@@ -12,15 +12,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useMemo } from "react";
 import {
-  ActivityIndicator,
-  Image,
-  Modal,
-  StyleSheet,
-  Switch,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Image,
+    Modal,
+    StyleSheet,
+    Switch,
+    TouchableOpacity,
+    View,
+    StatusBar,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Optimized theme toggle component for instant feedback
 const ThemeToggleSection = React.memo(() => {
@@ -274,15 +275,24 @@ export default function ProfileScreen() {
       await signOutGoogle();
       console.log("✅ Sign out completed");
 
-      // Clear local storage
+      // Clear local storage except preserved preferences (theme & language)
       try {
-        await AsyncStorage.clear();
-        console.log("✅ Local storage cleared");
+        const PRESERVED_KEYS = [
+          'user_theme_preference',
+          'user_language_preference',
+        ];
+        const keys = await AsyncStorage.getAllKeys();
+        const keysToRemove = keys.filter(k => !PRESERVED_KEYS.includes(k));
+        if (keysToRemove.length > 0) {
+          await AsyncStorage.multiRemove(keysToRemove);
+        }
+        console.log("✅ Local storage cleared (preserved theme/language)");
       } catch (storageError) {
         console.warn(
-          "⚠️ Failed to clear storage:",
+          "⚠️ Failed to clear storage selectively:",
           (storageError as Error).message || storageError
         );
+        // Best-effort fallback: remove user key only
         try {
           await AsyncStorage.removeItem("user");
         } catch {}
@@ -294,9 +304,17 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error("❌ Logout error:", error);
 
-      // Even if logout fails, clear local data and navigate to login
+      // Even if logout fails, clear local data (preserving prefs) and navigate to login
       try {
-        await AsyncStorage.clear();
+        const PRESERVED_KEYS = [
+          'user_theme_preference',
+          'user_language_preference',
+        ];
+        const keys = await AsyncStorage.getAllKeys();
+        const keysToRemove = keys.filter(k => !PRESERVED_KEYS.includes(k));
+        if (keysToRemove.length > 0) {
+          await AsyncStorage.multiRemove(keysToRemove);
+        }
       } catch {}
 
       navigateToLogin();
@@ -427,8 +445,20 @@ export default function ProfileScreen() {
     [theme]
   );
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      edges={["left", "right", "bottom"]}
+      style={{ flex: 1, backgroundColor: theme.colors.inputBackground }}
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={isDark ? "light-content" : "dark-content"}
+      />
+      <View style={{ height: insets.top }} />
+      <View style={styles.container}>
       {/* Profile Picture - Centered Outside Box */}
       <View style={styles.profileImageContainer}>
         {uploading ? (
@@ -659,6 +689,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
+      </View>
     </SafeAreaView>
   );
 }

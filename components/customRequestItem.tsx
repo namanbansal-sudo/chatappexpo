@@ -1,9 +1,9 @@
 // components/CustomRequestItem.tsx
-import React from 'react';
-import { View, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { CustomText } from '@/components/customText';
+import { CustomText } from '@/components/CustomText';
 import { useThemeContext } from '@/components/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 interface RequestItemProps {
   avatar: string;

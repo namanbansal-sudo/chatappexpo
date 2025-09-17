@@ -1,5 +1,5 @@
 import { useNavigateToChat } from '@/app/(services)/navigationService';
-import { CustomText } from '@/components/customText';
+import { CustomText } from '@/components/CustomText';
 import { configureGoogleSignIn, signInWithGoogle, signOutGoogle } from '@/components/googleSignIn';
 import { getText } from '@/components/texts';
 import { useThemeContext } from '@/components/ThemeContext';
@@ -8,13 +8,14 @@ import { ChatService } from '@/services/chatService';
 import { UserServiceSimple } from '@/services/userServiceSimple';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getFirestore, setDoc } from '@react-native-firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import styles from './Styles';
+import createStyles from './Styles';
 
 export const LoginScreen: React.FC = () => {
   const { theme } = useThemeContext();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
   const navigateToChat = useNavigateToChat();
@@ -189,9 +190,9 @@ export const LoginScreen: React.FC = () => {
           <TouchableOpacity onPress={handleGoogleSignIn} style={styles.googleButton}>
             <Image
               source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-              style={styles.googleIcon}
+              style={styles.googleIcon} 
             />
-            <CustomText color={theme.colors.text} style={styles.googleText}>
+            <CustomText style={styles.googleText}>
               Sign in with Google
             </CustomText>
           </TouchableOpacity>

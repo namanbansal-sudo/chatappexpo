@@ -1,9 +1,9 @@
 // components/CustomChatItem.tsx
-import React from 'react';
-import { View, Image, StyleSheet } from 'react-native';
-import { CustomText } from '@/components/customText';
+import { CustomText } from '@/components/CustomText';
 import { useThemeContext } from '@/components/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { Image, StyleSheet, View } from 'react-native';
 
 interface ChatItem {
   avatar: string;

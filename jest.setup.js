@@ -1,6 +1,8 @@
 import '@testing-library/jest-native/extend-expect';
 
-// Mock React Navigation
+// ----------------------
+// React Navigation
+// ----------------------
 jest.mock('@react-navigation/native', () => {
   const actualNav = jest.requireActual('@react-navigation/native');
   return {
@@ -10,48 +12,70 @@ jest.mock('@react-navigation/native', () => {
       goBack: jest.fn(),
       dispatch: jest.fn(),
       setOptions: jest.fn(),
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
     }),
     useRoute: () => ({
       params: {},
+      name: 'TestScreen',
     }),
+    useFocusEffect: jest.fn(),
   };
 });
 
-// Mock Expo modules
-jest.mock('expo-font');
-jest.mock('expo-asset');
-jest.mock('expo-av');
-jest.mock('expo-image-picker');
-jest.mock('expo-file-system');
+// ----------------------
+// Expo modules (all are default exports → export empty object as default)
+// ----------------------
+jest.mock('expo-font', () => ({ __esModule: true, default: {} }));
+jest.mock('expo-asset', () => ({ __esModule: true, default: {} }));
+jest.mock('expo-av', () => ({ __esModule: true, default: {} }));
+jest.mock('expo-image-picker', () => ({ __esModule: true, default: {} }));
+jest.mock('expo-file-system', () => ({ __esModule: true, default: {} }));
+jest.mock('expo-linear-gradient', () => ({ __esModule: true, default: {} }));
 
-// Mock Firebase
-jest.mock('@react-native-firebase/auth', () => ());
-jest.mock('@react-native-firebase/firestore', () => ());
-jest.mock('@react-native-firebase/app', () => ());
+// ----------------------
+// Firebase modules (all are default exports → export empty object as default)
+// ----------------------
+jest.mock('@react-native-firebase/auth', () => ({ __esModule: true, default: {} }));
+jest.mock('@react-native-firebase/firestore', () => ({ __esModule: true, default: {} }));
+jest.mock('@react-native-firebase/app', () => ({ __esModule: true, default: {} }));
 
-// Mock AsyncStorage
+// ----------------------
+// AsyncStorage (default export is an object with methods)
+// ----------------------
 jest.mock('@react-native-async-storage/async-storage', () => ({
-  setItem: jest.fn(),
-  getItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
-  getAllKeys: jest.fn(),
+  __esModule: true,
+  default: {
+    setItem: jest.fn(),
+    getItem: jest.fn(),
+    removeItem: jest.fn(),
+    clear: jest.fn(),
+  },
 }));
 
-// Mock Google Signin
-jest.mock('@react-native-google-signin/google-signin', () => ());
+// ----------------------
+// Reanimated (default export)
+// ----------------------
+jest.mock('react-native-reanimated', () => {
+  const Reanimated = require('react-native-reanimated/mock');
+  Reanimated.default.call = () => {};
+  return Reanimated;
+});
 
-// Mock i18next
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key) => key,
-    i18n: {
-      changeLanguage: jest.fn(),
-    },
-  }),
-}));
+// ----------------------
+// Gesture handler (default export)
+// ----------------------
+jest.mock('react-native-gesture-handler', () => ({ __esModule: true, default: {} }));
 
-// Mock your custom services
-jest.mock('./services/chatService');
-jest.mock('./services/userServiceSimple');
-jest.mock('./services/friendRequestService');
+// ----------------------
+// Safe area context (named + default exports)
+// ----------------------
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    SafeAreaProvider: ({ children }) => children,
+    SafeAreaView: ({ children }) => children,
+    useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  };
+});

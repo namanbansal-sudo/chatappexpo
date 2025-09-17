@@ -5,7 +5,7 @@ import { Animated, Easing, StatusBar, Text, View } from 'react-native';
 import styles from './Styles';
 
 const SplashScreen = () => {
-  const { theme } = useThemeContext();
+  const { theme, isDark } = useThemeContext();
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -37,8 +37,11 @@ const SplashScreen = () => {
   }, [dot1, dot2, dot3]);
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0b0c10" />
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <StatusBar 
+        barStyle={isDark ? 'light-content' : 'dark-content'} 
+        backgroundColor={theme.colors.background} 
+      />
       <Waves />
 
       <View style={{ alignItems: 'center', marginBottom: 40 }}>
@@ -64,7 +67,7 @@ const SplashScreen = () => {
         </View>
 
         <Text style={styles.title}>ChatApp</Text>
-        <Text style={{ fontSize: 16, color: '#c5c6c7', textAlign: 'center' }}>
+        <Text style={{ fontSize: 16, color: theme.colors.secondaryText, textAlign: 'center' }}>
           Connect with friends instantly
         </Text>
       </View>

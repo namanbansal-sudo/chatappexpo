@@ -1,7 +1,6 @@
-import { theme } from "@/components/theme";
 import { StyleSheet } from "react-native";
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -46,6 +45,7 @@ const styles = StyleSheet.create({
   },
   googleText: {
     fontSize: theme.fonts.sizes.regular,
+    color: theme.colors.text,
   },
   signUpContainer: {
     flexDirection: 'row',
@@ -55,6 +55,6 @@ const styles = StyleSheet.create({
   signUpText: {
     marginLeft: 5,
   },
-  });
+});
 
-export default styles;
+export default createStyles;

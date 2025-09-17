@@ -1,7 +1,7 @@
 import { useLanguage } from "@/i18n";
 import { Ionicons } from "@expo/vector-icons";
 import { Image, Modal, StyleSheet, TouchableOpacity, View } from "react-native";
-import { CustomText } from "./customText";
+import { CustomText } from "./CustomText";
 import { useThemeContext } from "./ThemeContext";
 
 interface ShowProfilePopupProps {

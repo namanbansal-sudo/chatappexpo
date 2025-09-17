@@ -2,7 +2,7 @@ import { NavigationProvider } from '@/app/(services)/navigationService';
 import { configureGoogleSignIn } from '@/components/googleSignIn';
 import { ThemeProvider } from '@/components/ThemeContext';
 import { UserProvider } from '@/components/UserContext';
-import { LanguageProvider } from '@/i18n';
+import { LanguageProvider, initializeLanguage, i18n } from '@/i18n';
 import '@/i18n/config';
 import SplashScreen from '@/screens/Splash/View';
 import { UserServiceSimple } from '@/services/userServiceSimple';
@@ -10,6 +10,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreenModule from 'expo-splash-screen';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import 'react-native-reanimated';
 
@@ -19,12 +20,37 @@ SplashScreenModule.preventAutoHideAsync();
 export default function RootLayout() {
   const [appIsReady, setAppIsReady] = useState(false);
   const [uid, setUid] = useState<string | null>(null);
+  const [initialIsDark, setInitialIsDark] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
     async function prepare() {
       try {
         console.log('RootLayout mounted - app starting');
         await configureGoogleSignIn();
+
+        // Ensure language is initialized before rendering UI
+        try {
+          const lng = await initializeLanguage();
+          await i18n.changeLanguage(lng);
+        } catch (langErr) {
+          console.warn('Language initialization error:', langErr);
+        }
+
+        // Load persisted theme preference early so Splash can reflect it
+        try {
+          const savedTheme = await AsyncStorage.getItem('user_theme_preference');
+          if (savedTheme === 'dark') setInitialIsDark(true);
+          else if (savedTheme === 'light') setInitialIsDark(false);
+          else setInitialIsDark(true); // default
+        } catch (e) {
+          console.warn('Failed to read theme preference:', e);
+          setInitialIsDark(true);
+        }
+
+        // Hide native splash so our React splash (which uses Theme/Language) is visible
+        try {
+          await SplashScreenModule.hideAsync();
+        } catch {}
 
         // TODO: fetch logged-in user UID (from Firebase Auth or your UserContext)
         const currentUserUid = "your-firebase-uid"; 
@@ -67,7 +93,9 @@ export default function RootLayout() {
 
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
-      await SplashScreenModule.hideAsync();
+      // Native splash is already hidden earlier once theme/language is ready.
+      // Keep this as a no-op to avoid flashing.
+      return;
     }
   }, [appIsReady]);
 
@@ -78,14 +106,29 @@ export default function RootLayout() {
   }, [appIsReady, onLayoutRootView]);
 
   if (!appIsReady) {
-    return <SplashScreen />;
+    // Render providers so Splash can access Theme/Language contexts
+    // If theme hasn't been determined yet, keep native splash visible
+    if (typeof initialIsDark === 'undefined') {
+      return null;
+    }
+    return (
+      <LanguageProvider>
+        <NavigationProvider>
+          <UserProvider>
+            <ThemeProvider initialIsDark={initialIsDark}>
+              <SplashScreen />
+            </ThemeProvider>
+          </UserProvider>
+        </NavigationProvider>
+      </LanguageProvider>
+    );
   }
 
   return (
     <LanguageProvider>
       <NavigationProvider>
         <UserProvider>
-          <ThemeProvider>
+          <ThemeProvider initialIsDark={initialIsDark}>
             <Stack initialRouteName="(screens)" screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(screens)" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

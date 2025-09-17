@@ -34,4 +34,4 @@ export const CustomText: React.FC<CustomTextProps> = React.memo(({
       {children}
     </Text>
   );
-});
+})
