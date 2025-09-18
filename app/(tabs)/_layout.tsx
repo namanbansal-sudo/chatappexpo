@@ -313,20 +313,21 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBarWrapper: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 25,
     left: 0,
     right: 0,
   },
   tabBarContainer: {
     flexDirection: 'row',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 30,
     overflow: 'hidden',
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    marginHorizontal: 20,
+    marginVertical: 10,
   },
   notchContainer: {
     position: 'absolute',

@@ -312,6 +312,9 @@ function ChatRoom() {
   const name = nameParam || "Chat";
   const avatar = avatarParam || "";
   const friendUserId = friendUserIdParam || userIdParam;
+  const openCameraParam = Array.isArray(params.openCamera)
+    ? params.openCamera[0]
+    : (params as any).openCamera;
 
   const { theme, isDark } = useThemeContext();
   const { t } = useLanguage();
@@ -419,6 +422,13 @@ function ChatRoom() {
       setProfileLoading(false);
     }
   }, [friendUserId, t]);
+
+  // Ensure header name/avatar are loaded when opening via quick actions
+  useEffect(() => {
+    if (friendUserId) {
+      fetchFriendProfile();
+    }
+  }, [friendUserId, fetchFriendProfile]);
 
   // -------- Helpers --------
   const getDateHeaderText = (dateLike: any): string => {
@@ -1711,7 +1721,20 @@ function ChatRoom() {
     setForwardPopup({ visible: false, message: null });
 
     try {
-      await ChatService.forwardMessage(message, userIds, user?.uid || "");
+      let messageToForward = { ...message } as Message;
+
+      // If the mediaUrl is a local file path (from quick action camera), upload it first
+      const isLocal = messageToForward.mediaUrl && typeof messageToForward.mediaUrl === 'string' && !messageToForward.mediaUrl.startsWith('http');
+      if (isLocal && messageToForward.mediaUrl) {
+        const mediaType = (messageToForward.mediaType === 'video' ? 'video' : 'image') as 'image' | 'video';
+        const cloudinaryUrl = await uploadToCloudinary(messageToForward.mediaUrl, mediaType);
+        messageToForward = {
+          ...messageToForward,
+          mediaUrl: cloudinaryUrl,
+        };
+      }
+
+      await ChatService.forwardMessage(messageToForward as any, userIds, user?.uid || "");
       Alert.alert(t("common.success"), t("chat.messageForwarded"));
     } catch (error) {
       console.error("Error forwarding message:", error);
@@ -1719,39 +1742,83 @@ function ChatRoom() {
     }
   };
 
-  // Update the takePhoto function similarly
-  const takePhoto = async (mediaType: "image" | "video" = "image") => {
-    setShowMediaOptions(false);
+// Update the takePhoto function to handle the quick action flow:
+const takePhoto = async (mediaType: "image" | "video" = "image") => {
+  setShowMediaOptions(false);
 
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes:
-          mediaType === "video"
-            ? ImagePicker.MediaTypeOptions.Videos
-            : ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: mediaType === "video" ? undefined : [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const newMediaFile = {
-          uri: result.assets[0].uri,
-          type: mediaType,
-          fileName:
-            result.assets[0].fileName ||
-            `${mediaType}_${Date.now()}.${
-              mediaType === "video" ? "mp4" : "jpg"
-            }`,
-        };
-
-        setSelectedMediaFiles((prev) => [...prev, newMediaFile]);
-      }
-    } catch (error) {
-      console.error("Error taking photo/video:", error);
-      Alert.alert(t("common.error"), t("chat.cameraError"));
+  try {
+    // Request camera permissions
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert(
+        t("common.permissionRequired"),
+        t("chat.cameraPermissionRequired")
+      );
+      return;
     }
-  };
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes:
+        mediaType === "video"
+          ? ImagePicker.MediaTypeOptions.Videos
+          : ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: mediaType === "video" ? undefined : [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const newMediaFile = {
+        uri: result.assets[0].uri,
+        type: mediaType,
+        fileName:
+          result.assets[0].fileName ||
+          `${mediaType}_${Date.now()}.${
+            mediaType === "video" ? "mp4" : "jpg"
+          }`,
+      };
+
+      setSelectedMediaFiles((prev) => [...prev, newMediaFile]);
+      
+      // Auto-show forward popup if this was triggered by quick action
+      if (openCameraParam === 'true' || openCameraParam === true) {
+        // After taking photo, automatically show the forward popup
+        setTimeout(() => {
+          setForwardPopup({
+            visible: true,
+            message: {
+              id: 'camera_quick_action',
+              text: '',
+              sender: 'user',
+              time: new Date().toLocaleTimeString(),
+              timestamp: new Date(),
+              mediaUrl: result.assets[0].uri,
+              mediaType: mediaType,
+              fileName: newMediaFile.fileName
+            } as Message
+          });
+        }, 500);
+      }
+    }
+  } catch (error) {
+    console.error("Error taking photo/video:", error);
+    Alert.alert(t("common.error"), t("chat.cameraError"));
+  }
+};
+
+  // Replace the existing useEffect that handles openCameraParam with this:
+useEffect(() => {
+  if (openCameraParam === 'true' || openCameraParam === true) {
+    // Delay slightly to ensure navigation stack is ready and component is mounted
+    const timer = setTimeout(() => {
+      console.log('Quick action: Opening camera from route param');
+      takePhoto('image');
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }
+}, [openCameraParam]);
 
   const handleMediaUpload = async (
     uri: string,
@@ -2561,13 +2628,15 @@ function ChatRoom() {
             }
           />
 
-          {/* Media Attachment Preview */}
-          <MediaAttachmentPreview
-            selectedMediaFiles={selectedMediaFiles}
-            setSelectedMediaFiles={setSelectedMediaFiles}
-            theme={theme}
-            uploading={uploading}
-          />
+          {/* Media Attachment Preview (hidden while forward modal is open) */}
+          {!forwardPopup.visible && (
+            <MediaAttachmentPreview
+              selectedMediaFiles={selectedMediaFiles}
+              setSelectedMediaFiles={setSelectedMediaFiles}
+              theme={theme}
+              uploading={uploading}
+            />
+          )}
 
           {/* Input area */}
           {/* Input Container */}

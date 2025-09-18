@@ -8,6 +8,7 @@ import {
   Modal,
   TouchableOpacity,
   View,
+  TextInput,
 } from "react-native";
 import { CustomSearchInput } from "./customSearchInput";
 import { CustomText } from "./CustomText";
@@ -17,7 +18,8 @@ import { useUser } from "./UserContext";
 interface ForwardMessagePopupProps {
   visible: boolean;
   onClose: () => void;
-  onForward: (userIds: string[]) => void;
+  onForward: (userIds: string[], caption?: string) => void;
+  enableCaption?: boolean;
 }
 
 interface User {
@@ -31,6 +33,7 @@ export const ForwardMessagePopup: React.FC<ForwardMessagePopupProps> = ({
   visible,
   onClose,
   onForward,
+  enableCaption = false,
 }) => {
   const { theme } = useThemeContext();
   const { t } = useLanguage();
@@ -39,6 +42,7 @@ export const ForwardMessagePopup: React.FC<ForwardMessagePopupProps> = ({
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [caption, setCaption] = useState<string>("");
 
   useEffect(() => {
     if (visible && user?.uid) {
@@ -98,9 +102,10 @@ export const ForwardMessagePopup: React.FC<ForwardMessagePopupProps> = ({
 
   const handleForward = () => {
     if (selectedUsers.size > 0) {
-      onForward(Array.from(selectedUsers));
+      onForward(Array.from(selectedUsers), caption.trim());
       setSelectedUsers(new Set());
       setSearch("");
+      setCaption("");
       onClose();
     }
   };
@@ -108,17 +113,24 @@ export const ForwardMessagePopup: React.FC<ForwardMessagePopupProps> = ({
   const handleClose = () => {
     setSelectedUsers(new Set());
     setSearch("");
+    setCaption("");
     onClose();
   };
 
   if (!visible) return null;
 
   return (
-    <Modal transparent visible={visible} onRequestClose={handleClose}>
+    <Modal 
+      visible={visible} 
+      onRequestClose={handleClose} 
+      animationType="fade"
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+    >
       <View
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.5)",
+          backgroundColor: "rgba(0,0,0,0.6)",
           justifyContent: "center",
           alignItems: "center",
         }}
@@ -182,17 +194,26 @@ export const ForwardMessagePopup: React.FC<ForwardMessagePopupProps> = ({
               </CustomText>
             </View>
           )}
-          // AND for the button:
-          <CustomText
-            color={
-              selectedUsers.size > 0
-                ? theme.colors.background
-                : theme.colors.secondaryText
-            }
-            style={{ fontWeight: "600" }}
-          >
-            Forward ({selectedUsers.size})
-          </CustomText>
+
+          {enableCaption && (
+            <TextInput
+              placeholder={t("Add Caption")}
+              placeholderTextColor={theme.colors.secondaryText}
+              value={caption}
+              onChangeText={setCaption}
+              style={{
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                borderRadius: 12,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                color: theme.colors.text,
+                marginBottom: 15,
+              }}
+              multiline
+            />
+          )}
+
           {/* Users List */}
           {loading ? (
             <View style={{ padding: 40, alignItems: "center" }}>
@@ -335,7 +356,7 @@ export const ForwardMessagePopup: React.FC<ForwardMessagePopupProps> = ({
                 }
                 style={{ fontWeight: "600" }}
               >
-                {t("Forward", { count: selectedUsers.size })}
+                {t("Forward")} ({selectedUsers.size})
               </CustomText>
             </TouchableOpacity>
           </View>

@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { StyleProp, TextStyle, TouchableOpacity, ViewStyle } from 'react-native';
 import { useThemeContext } from './ThemeContext';
-import CustomText from './CustomText';
+import { CustomText } from './CustomText';
 
 interface CustomButtonProps {
   title: string;
@@ -12,7 +12,7 @@ interface CustomButtonProps {
   testID?: string;
 }
 
-export const CustomButton: React.FC<CustomButtonProps> = React.memo(({ 
+const CustomButton: React.FC<CustomButtonProps> = React.memo(({ 
   title, 
   onPress, 
   style, 
@@ -45,3 +45,5 @@ export const CustomButton: React.FC<CustomButtonProps> = React.memo(({
     </TouchableOpacity>
   );
 });
+
+export default CustomButton;

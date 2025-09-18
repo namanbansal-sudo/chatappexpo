@@ -16,7 +16,9 @@ import {
   where,
   writeBatch,
 } from "@react-native-firebase/firestore";
+import { addRecentChat } from "@/utils/quickActions";
 import { Chat, ChatMessage, ChatSimple } from "../types/models";
+import { UserServiceSimple } from "./userServiceSimple";
 
 type Unsubscribe = () => void;
 
@@ -360,6 +362,9 @@ async markIncomingFromSenderAsRead(
         await setDoc(chatRef, chatData);
       }
   
+      const chatName = "Chat Name"; 
+      await this.updateRecentChats(senderId, chatId, chatName, message);
+      
       return newMessageRef.id;
     } catch (error) {
       console.error("Error sending message:", error);
@@ -617,6 +622,13 @@ async markIncomingFromSenderAsRead(
           };
           await setDoc(chatRef, chatData);
         }
+
+        // Update recent chats for quick actions (top-3)
+        try {
+          await ChatService.updateRecentChats(senderId, chatId, "", lastMessage);
+        } catch (e) {
+          console.warn("Failed to update recent chats after forwarding:", e);
+        }
       });
 
       await Promise.all(forwardPromises);
@@ -627,19 +639,35 @@ async markIncomingFromSenderAsRead(
     }
   },
 
-  // Add this method to update recent chats when messages are sent/received
+// In your ChatService, update the updateRecentChats method:
 async updateRecentChats(userId: string, chatId: string, chatName: string, lastMessage: string): Promise<void> {
   try {
+    // Compute friendUserId from chatId (formatted as sorted pair "a_b")
+    const [a, b] = chatId.split("_");
+    const friendUserId = a === userId ? b : a;
+
+    // Get friend's name from Firestore or use the provided chatName
+    let friendName = chatName;
+    try {
+      const friendUser = await UserServiceSimple.getUserById(friendUserId);
+      if (friendUser && friendUser.name) {
+        friendName = friendUser.name;
+      }
+    } catch (error) {
+      console.log('Could not fetch friend name, using provided name:', error);
+    }
+
     // Add to recent chats for quick actions
     await addRecentChat({
       id: chatId,
-      name: chatName,
-      lastMessage
+      name: friendName,
+      lastMessage,
+      friendUserId,
     });
   } catch (error) {
     console.error('Error updating recent chats:', error);
   }
-},
+}
 };
 
 export type { Chat, ChatMessage };
