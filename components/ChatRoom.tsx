@@ -12,7 +12,13 @@ import * as ImagePicker from "expo-image-picker";
 import * as IntentLauncher from "expo-intent-launcher";
 import * as MediaLibrary from "expo-media-library";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -190,7 +196,7 @@ interface Message {
   };
   edited?: boolean;
   mediaUrl?: string;
-  mediaType?: "image" | "video" | "audio";
+  mediaType?: "image" | "video" | "audio"| "gif";
   fileName?: string;
   isUploading?: boolean;
 }
@@ -213,7 +219,7 @@ interface FirebaseChatMessage {
   replyTo?: any;
   edited?: boolean;
   mediaUrl?: string;
-  mediaType?: "image" | "video" | "audio";
+  mediaType?: "image" | "video" | "audio"| "gif";
 }
 
 interface FriendProfile {
@@ -382,9 +388,13 @@ function ChatRoom() {
   const WAVEFORM_H = 20;
   const waveHeights = useMemo(() => {
     const width = waveformWidth;
-    const count = width > 0
-      ? Math.max(1, Math.floor((width + BAR_SPACING) / (BAR_WIDTH + BAR_SPACING)))
-      : 0;
+    const count =
+      width > 0
+        ? Math.max(
+            1,
+            Math.floor((width + BAR_SPACING) / (BAR_WIDTH + BAR_SPACING))
+          )
+        : 0;
     // Normalized repeating pattern; offset by recSeconds for subtle movement over time
     const pattern = [0.3, 0.55, 0.8, 1, 0.8, 0.55, 0.3];
     const maxH = Math.floor(WAVEFORM_H * 0.95);
@@ -481,11 +491,13 @@ function ChatRoom() {
     }
 
     // Filter out any existing date headers to avoid duplicates
-    const regularMessages = (messageList as Array<Message | MessageWithHeader>)
-      .filter((m) => {
-        const isHeader = "isDateHeader" in m && (m as MessageWithHeader).isDateHeader;
-        return !isHeader && !(m.id?.startsWith("header_"));
-      }) as Message[];
+    const regularMessages = (
+      messageList as Array<Message | MessageWithHeader>
+    ).filter((m) => {
+      const isHeader =
+        "isDateHeader" in m && (m as MessageWithHeader).isDateHeader;
+      return !isHeader && !m.id?.startsWith("header_");
+    }) as Message[];
 
     // 1. Sort in CHRONOLOGICAL order (oldest first)
     const chronologicalMessages = [...regularMessages].sort(
@@ -898,35 +910,37 @@ function ChatRoom() {
       .forEach((m) => ensureAudioDuration(m.id, m.mediaUrl!));
   }, [messages]);
 
-  const getReplyPreviewText = (
-    reply: Message["replyTo"] | Message | null | undefined,
-    allMsgs: Message[] = messages
-  ) => {
-    try {
-      if (!reply) return "";
-      // Try to locate the original message using messageId or id
-      // @ts-ignore
-      const replyId = (reply?.messageId || (reply as any)?.id) as
-        | string
-        | undefined;
-      const original = replyId
-        ? allMsgs.find((m) => m.id === replyId)
-        : (reply as any);
-      const mediaType = original?.mediaType as
-        | "image"
-        | "video"
-        | "audio"
-        | undefined;
-      if (mediaType === "image") return "Image";
-      if (mediaType === "video") return "Video";
-      if (mediaType === "audio") return "Voice note";
-      // fallback to provided reply text
-      // @ts-ignore
-      return (reply as any)?.text || "";
-    } catch {
-      return "";
-    }
-  };
+// Update the getReplyPreviewText function to handle GIFs
+const getReplyPreviewText = (
+  reply: Message["replyTo"] | Message | null | undefined,
+  allMsgs: Message[] = messages
+) => {
+  try {
+    if (!reply) return "";
+    // Try to locate the original message using messageId or id
+    // @ts-ignore
+    const replyId = (reply?.messageId || (reply as any)?.id) as
+      | string
+      | undefined;
+    const original = replyId
+      ? allMsgs.find((m) => m.id === replyId)
+      : (reply as any);
+    const mediaType = original?.mediaType as
+      | "image"
+      | "video"
+      | "audio"
+      | "gif"  // Add 'gif' here
+      | undefined;
+    if (mediaType === "image" || mediaType === "gif") return "Image"; // Group GIF with images
+    if (mediaType === "video") return "Video";
+    if (mediaType === "audio") return "Voice note";
+    // fallback to provided reply text
+    // @ts-ignore
+    return (reply as any)?.text || "";
+  } catch {
+    return "";
+  }
+};
 
   // -------- Realtime subscription --------
   useEffect(() => {
@@ -1219,8 +1233,7 @@ function ChatRoom() {
                   text: replyingTo.text,
                   senderId:
                     replyingTo.sender === "user" ? user.uid : friendUserId,
-                  senderName:
-                    replyingTo.sender === "user" ? "You" : name,
+                  senderName: replyingTo.sender === "user" ? "You" : name,
                 }
               : undefined,
             {
@@ -1534,20 +1547,26 @@ function ChatRoom() {
     if (message.text) {
       await Clipboard.setStringAsync(message.text);
       showToast(t("chat.messageCopied")); // toast only
-    } else if (message.mediaType === "image" && message.mediaUrl) {
+    } else if (message.mediaType === "image" || message.mediaType === "gif" && message.mediaUrl) {
       try {
         const fileUri = `${
           FileSystem.cacheDirectory
-        }temp_image_${Date.now()}.jpg`;
+        }temp_image_${Date.now()}.${message.mediaType === "gif" ? "gif" : "jpg"}`;
         const { uri } = await FileSystem.downloadAsync(
           message.mediaUrl,
           fileUri
         );
-        const base64 = await FileSystem.readAsStringAsync(uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        await Clipboard.setImageAsync(base64);
-        showToast(t("chat.imageCopied")); // toast only
+        if (message.mediaType === "gif") {
+          // For GIFs, we can copy the URL as they're harder to copy as images
+          await Clipboard.setStringAsync(message.mediaUrl);
+          showToast(t("chat.gifUrlCopied"));
+        } else {
+          const base64 = await FileSystem.readAsStringAsync(uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          await Clipboard.setImageAsync(base64);
+          showToast(t("chat.imageCopied"));
+        }
       } catch (error) {
         console.error("Error copying image:", error);
         Alert.alert(t("common.error"), t("chat.copyError"));
@@ -1591,7 +1610,8 @@ function ChatRoom() {
                     Linking.openURL("app-settings:");
                   } else {
                     IntentLauncher.startActivityAsync(
-                      IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+                      IntentLauncher.ActivityAction
+                        .APPLICATION_DETAILS_SETTINGS,
                       { data: "package:" + Constants.appId }
                     );
                   }
@@ -1607,11 +1627,11 @@ function ChatRoom() {
 
       // Create appropriate file extension
       const fileExtension =
-        message.mediaType === "image"
-          ? "jpg"
-          : message.mediaType === "video"
-          ? "mp4"
-          : "m4a";
+      message.mediaType === "image" || message.mediaType === "gif" // Handle GIFs
+        ? message.mediaType === "gif" ? "gif" : "jpg" // Use correct extension for GIFs
+        : message.mediaType === "video"
+        ? "mp4"
+        : "m4a";
       const fileName = `ChatMedia_${Date.now()}.${fileExtension}`;
 
       // Download to cache directory first
@@ -1724,17 +1744,29 @@ function ChatRoom() {
       let messageToForward = { ...message } as Message;
 
       // If the mediaUrl is a local file path (from quick action camera), upload it first
-      const isLocal = messageToForward.mediaUrl && typeof messageToForward.mediaUrl === 'string' && !messageToForward.mediaUrl.startsWith('http');
+      const isLocal =
+        messageToForward.mediaUrl &&
+        typeof messageToForward.mediaUrl === "string" &&
+        !messageToForward.mediaUrl.startsWith("http");
       if (isLocal && messageToForward.mediaUrl) {
-        const mediaType = (messageToForward.mediaType === 'video' ? 'video' : 'image') as 'image' | 'video';
-        const cloudinaryUrl = await uploadToCloudinary(messageToForward.mediaUrl, mediaType);
+        const mediaType = (
+          messageToForward.mediaType === "video" ? "video" : "image"
+        ) as "image" | "video";
+        const cloudinaryUrl = await uploadToCloudinary(
+          messageToForward.mediaUrl,
+          mediaType
+        );
         messageToForward = {
           ...messageToForward,
           mediaUrl: cloudinaryUrl,
         };
       }
 
-      await ChatService.forwardMessage(messageToForward as any, userIds, user?.uid || "");
+      await ChatService.forwardMessage(
+        messageToForward as any,
+        userIds,
+        user?.uid || ""
+      );
       Alert.alert(t("common.success"), t("chat.messageForwarded"));
     } catch (error) {
       console.error("Error forwarding message:", error);
@@ -1742,83 +1774,83 @@ function ChatRoom() {
     }
   };
 
-// Update the takePhoto function to handle the quick action flow:
-const takePhoto = async (mediaType: "image" | "video" = "image") => {
-  setShowMediaOptions(false);
+  // Update the takePhoto function to handle the quick action flow:
+  const takePhoto = async (mediaType: "image" | "video" = "image") => {
+    setShowMediaOptions(false);
 
-  try {
-    // Request camera permissions
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    
-    if (status !== 'granted') {
-      Alert.alert(
-        t("common.permissionRequired"),
-        t("chat.cameraPermissionRequired")
-      );
-      return;
-    }
+    try {
+      // Request camera permissions
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes:
-        mediaType === "video"
-          ? ImagePicker.MediaTypeOptions.Videos
-          : ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: mediaType === "video" ? undefined : [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const newMediaFile = {
-        uri: result.assets[0].uri,
-        type: mediaType,
-        fileName:
-          result.assets[0].fileName ||
-          `${mediaType}_${Date.now()}.${
-            mediaType === "video" ? "mp4" : "jpg"
-          }`,
-      };
-
-      setSelectedMediaFiles((prev) => [...prev, newMediaFile]);
-      
-      // Auto-show forward popup if this was triggered by quick action
-      if (openCameraParam === 'true' || openCameraParam === true) {
-        // After taking photo, automatically show the forward popup
-        setTimeout(() => {
-          setForwardPopup({
-            visible: true,
-            message: {
-              id: 'camera_quick_action',
-              text: '',
-              sender: 'user',
-              time: new Date().toLocaleTimeString(),
-              timestamp: new Date(),
-              mediaUrl: result.assets[0].uri,
-              mediaType: mediaType,
-              fileName: newMediaFile.fileName
-            } as Message
-          });
-        }, 500);
+      if (status !== "granted") {
+        Alert.alert(
+          t("common.permissionRequired"),
+          t("chat.cameraPermissionRequired")
+        );
+        return;
       }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes:
+          mediaType === "video"
+            ? ImagePicker.MediaTypeOptions.Videos
+            : ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: mediaType === "video" ? undefined : [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const newMediaFile = {
+          uri: result.assets[0].uri,
+          type: mediaType,
+          fileName:
+            result.assets[0].fileName ||
+            `${mediaType}_${Date.now()}.${
+              mediaType === "video" ? "mp4" : "jpg"
+            }`,
+        };
+
+        setSelectedMediaFiles((prev) => [...prev, newMediaFile]);
+
+        // Auto-show forward popup if this was triggered by quick action
+        if (openCameraParam === "true" || openCameraParam === true) {
+          // After taking photo, automatically show the forward popup
+          setTimeout(() => {
+            setForwardPopup({
+              visible: true,
+              message: {
+                id: "camera_quick_action",
+                text: "",
+                sender: "user",
+                time: new Date().toLocaleTimeString(),
+                timestamp: new Date(),
+                mediaUrl: result.assets[0].uri,
+                mediaType: mediaType,
+                fileName: newMediaFile.fileName,
+              } as Message,
+            });
+          }, 500);
+        }
+      }
+    } catch (error) {
+      console.error("Error taking photo/video:", error);
+      Alert.alert(t("common.error"), t("chat.cameraError"));
     }
-  } catch (error) {
-    console.error("Error taking photo/video:", error);
-    Alert.alert(t("common.error"), t("chat.cameraError"));
-  }
-};
+  };
 
   // Replace the existing useEffect that handles openCameraParam with this:
-useEffect(() => {
-  if (openCameraParam === 'true' || openCameraParam === true) {
-    // Delay slightly to ensure navigation stack is ready and component is mounted
-    const timer = setTimeout(() => {
-      console.log('Quick action: Opening camera from route param');
-      takePhoto('image');
-    }, 300);
-    
-    return () => clearTimeout(timer);
-  }
-}, [openCameraParam]);
+  useEffect(() => {
+    if (openCameraParam === "true" || openCameraParam === true) {
+      // Delay slightly to ensure navigation stack is ready and component is mounted
+      const timer = setTimeout(() => {
+        console.log("Quick action: Opening camera from route param");
+        takePhoto("image");
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }
+  }, [openCameraParam]);
 
   const handleMediaUpload = async (
     uri: string,
@@ -2089,7 +2121,7 @@ useEffect(() => {
                     disabled={item.isUploading}
                     style={{ marginBottom: item.text ? 8 : 0 }}
                   >
-                    {item.mediaType === "image" ? (
+                    {item.mediaType === "image" || item.mediaType === "gif" ? (
                       <Image
                         source={{ uri: item.mediaUrl }}
                         style={{
@@ -2165,9 +2197,7 @@ useEffect(() => {
                           }}
                         >
                           <Ionicons
-                            name={
-                              playingAudioId === item.id ? "pause" : "play"
-                            }
+                            name={playingAudioId === item.id ? "pause" : "play"}
                             size={18}
                             color="white"
                           />
@@ -2349,7 +2379,7 @@ useEffect(() => {
       Alert.alert(t("common.error"), t("chat.mediaSelectionError"));
     }
   };
-  
+
   // MediaAttachmentPreview component used below (defined here to avoid hoisting issues)
   const MediaAttachmentPreview = React.memo(
     ({
@@ -2576,413 +2606,424 @@ useEffect(() => {
           keyboardVerticalOffset={Platform.OS === "ios" ? headerHeight : 0}
         >
           <View style={{ flex: 1 }}>
-          {/* Messages list */}
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item: any, index: number) => `${item.id}_${index}`}
-            style={{ flex: 1 }}
-            contentContainerStyle={{
-              padding: 10,
-              paddingTop: 8,
-              paddingBottom: Platform.select({
-                ios: 10,
-                android: 4,
-              }),
-            }}
-            inverted={true}
-            automaticallyAdjustContentInsets={false}
-            automaticallyAdjustKeyboardInsets={Platform.OS !== "ios"}
-            keyboardDismissMode="interactive"
-            keyboardShouldPersistTaps="handled"
-            scrollEnabled={true}
-            showsVerticalScrollIndicator={false}
-            removeClippedSubviews={false}
-            nestedScrollEnabled={true}
-            initialNumToRender={20}
-            maxToRenderPerBatch={10}
-            windowSize={21}
-            scrollEventThrottle={16}
-            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-            getItemLayout={(data: any, index: number) =>
-              getItemLayout(data as MessageWithHeader[] | null, index)
-            }
-            ListEmptyComponent={
-              !loading && messages.length === 0 ? (
-                <View style={{ alignItems: "center", paddingVertical: 250 }}>
-                  <Ionicons
-                    name="chatbubble-outline"
-                    size={60}
-                    color={theme.colors.secondaryText}
-                  />
-                  <CustomText
-                    fontSize={theme.fonts.sizes.title}
-                    color={theme.colors.text}
-                    style={{ textAlign: "center", marginTop: 20 }}
-                  >
-                    {t("Start Conversation")}
-                  </CustomText>
-                </View>
-              ) : null
-            }
-          />
-
-          {/* Media Attachment Preview (hidden while forward modal is open) */}
-          {!forwardPopup.visible && (
-            <MediaAttachmentPreview
-              selectedMediaFiles={selectedMediaFiles}
-              setSelectedMediaFiles={setSelectedMediaFiles}
-              theme={theme}
-              uploading={uploading}
-            />
-          )}
-
-          {/* Input area */}
-          {/* Input Container */}
-          <View
-            style={{
-              backgroundColor: theme.colors.background,
-              paddingBottom: Platform.select({
-                ios: insets.bottom,
-                android: Math.max(4, insets.bottom),
-              }),
-            }}
-          >
-            {/* Editing/Replying Indicator */}
-            {editingMessage && (
-              <View
-                style={{
-                  backgroundColor: theme.colors.inputBackground,
-                  marginHorizontal: 10,
-                  marginBottom: 8,
-                  padding: 12,
-                  borderRadius: 8,
-                  borderLeftWidth: 4,
-                  borderLeftColor: "#FFA500",
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <View style={{ flex: 1 }}>
-                    <CustomText
-                      fontSize={theme.fonts.sizes.small}
-                      color={"#FFA500"}
-                      fontWeight="500"
-                    >
-                      {t("Editing Message")}
-                    </CustomText>
-                    <CustomText
-                      fontSize={theme.fonts.sizes.small}
-                      color={theme.colors.secondaryText}
-                      numberOfLines={1}
-                      style={{ marginTop: 2 }}
-                    >
-                      {editingMessage.text}
-                    </CustomText>
-                  </View>
-                  <TouchableOpacity
-                    onPress={handleCancelEdit}
-                    style={{ marginLeft: 10 }}
-                  >
-                    <Ionicons
-                      name="close"
-                      size={20}
-                      color={theme.colors.secondaryText}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {replyingTo && !editingMessage && (
-              <View
-                style={{
-                  backgroundColor: theme.colors.inputBackground,
-                  marginHorizontal: 10,
-                  marginBottom: 8,
-                  padding: 12,
-                  borderRadius: 8,
-                  borderLeftWidth: 4,
-                  borderLeftColor: theme.colors.primary,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <View style={{ flex: 1 }}>
-                    <CustomText
-                      fontSize={theme.fonts.sizes.small}
-                      color={theme.colors.primary}
-                      fontWeight="500"
-                    >
-                      {t("chat.replyingTo")}{" "}
-                      {replyingTo.sender === "user"
-                        ? t("chat.you")
-                        : friendProfile?.name || name}
-                    </CustomText>
-                    <CustomText
-                      fontSize={theme.fonts.sizes.small}
-                      color={theme.colors.secondaryText}
-                      numberOfLines={1}
-                      style={{ marginTop: 2 }}
-                    >
-                      {replyingTo?.mediaType
-                        ? getReplyPreviewText(replyingTo as any, messages)
-                        : replyingTo?.text}
-                    </CustomText>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => setReplyingTo(null)}
-                    style={{ marginLeft: 10 }}
-                  >
-                    <Ionicons
-                      name="close"
-                      size={20}
-                      color={theme.colors.secondaryText}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {/* Input Field */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingHorizontal: 10,
-                paddingTop: 5,
+            {/* Messages list */}
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              renderItem={renderMessage}
+              keyExtractor={(item: any, index: number) => `${item.id}_${index}`}
+              style={{ flex: 1 }}
+              contentContainerStyle={{
+                padding: 10,
+                paddingTop: 8,
                 paddingBottom: Platform.select({
                   ios: 10,
-                  android: 6,
+                  android: 4,
+                }),
+              }}
+              inverted={true}
+              automaticallyAdjustContentInsets={false}
+              automaticallyAdjustKeyboardInsets={Platform.OS !== "ios"}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
+              scrollEnabled={true}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={false}
+              nestedScrollEnabled={true}
+              initialNumToRender={20}
+              maxToRenderPerBatch={10}
+              windowSize={21}
+              scrollEventThrottle={16}
+              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+              getItemLayout={(data: any, index: number) =>
+                getItemLayout(data as MessageWithHeader[] | null, index)
+              }
+              ListEmptyComponent={
+                !loading && messages.length === 0 ? (
+                  <View style={{ alignItems: "center", paddingVertical: 250 }}>
+                    <Ionicons
+                      name="chatbubble-outline"
+                      size={60}
+                      color={theme.colors.secondaryText}
+                    />
+                    <CustomText
+                      fontSize={theme.fonts.sizes.title}
+                      color={theme.colors.text}
+                      style={{ textAlign: "center", marginTop: 20 }}
+                    >
+                      {t("Start Conversation")}
+                    </CustomText>
+                  </View>
+                ) : null
+              }
+            />
+
+            {/* Media Attachment Preview (hidden while forward modal is open) */}
+            {!forwardPopup.visible && (
+              <MediaAttachmentPreview
+                selectedMediaFiles={selectedMediaFiles}
+                setSelectedMediaFiles={setSelectedMediaFiles}
+                theme={theme}
+                uploading={uploading}
+              />
+            )}
+
+            {/* Input area */}
+            {/* Input Container */}
+            <View
+              style={{
+                backgroundColor: theme.colors.background,
+                paddingBottom: Platform.select({
+                  ios: insets.bottom,
+                  android: Math.max(4, insets.bottom),
                 }),
               }}
             >
-              <TouchableOpacity
-                onPress={
-                  uploading || recording !== null
-                    ? undefined
-                    : openAttachmentSheet
-                }
-                disabled={uploading || recording !== null}
-                style={{
-                  marginRight: 10,
-                  padding: 8,
-                  borderRadius: 20,
-                  backgroundColor: theme.colors.inputBackground,
-                }}
-              >
-                <Ionicons
-                  name="add"
-                  size={24}
-                  color={
-                    uploading || recording !== null
-                      ? theme.colors.secondaryText
-                      : theme.colors.primary
-                  }
-                />
-              </TouchableOpacity>
-
-              {recording ? (
+              {/* Editing/Replying Indicator */}
+              {editingMessage && (
                 <View
                   style={{
-                    flex: 1,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    height: 44,
-                    paddingHorizontal: 12,
                     backgroundColor: theme.colors.inputBackground,
-                    borderRadius: 16,
-                    marginRight: 10,
+                    marginHorizontal: 10,
+                    marginBottom: 8,
+                    padding: 12,
+                    borderRadius: 8,
+                    borderLeftWidth: 4,
+                    borderLeftColor: "#FFA500",
                   }}
                 >
-                  <CustomText
-                    color={theme.colors.text}
-                    style={{ fontVariant: ["tabular-nums"], marginRight: 10 }}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
                   >
-                    {`${Math.floor(recSeconds / 60)}:${(recSeconds % 60)
-                      .toString()
-                      .padStart(2, "0")}`}
-                  </CustomText>
+                    <View style={{ flex: 1 }}>
+                      <CustomText
+                        fontSize={theme.fonts.sizes.small}
+                        color={"#FFA500"}
+                        fontWeight="500"
+                      >
+                        {t("Editing Message")}
+                      </CustomText>
+                      <CustomText
+                        fontSize={theme.fonts.sizes.small}
+                        color={theme.colors.secondaryText}
+                        numberOfLines={1}
+                        style={{ marginTop: 2 }}
+                      >
+                        {editingMessage.text}
+                      </CustomText>
+                    </View>
+                    <TouchableOpacity
+                      onPress={handleCancelEdit}
+                      style={{ marginLeft: 10 }}
+                    >
+                      <Ionicons
+                        name="close"
+                        size={20}
+                        color={theme.colors.secondaryText}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {replyingTo && !editingMessage && (
+                <View
+                  style={{
+                    backgroundColor: theme.colors.inputBackground,
+                    marginHorizontal: 10,
+                    marginBottom: 8,
+                    padding: 12,
+                    borderRadius: 8,
+                    borderLeftWidth: 4,
+                    borderLeftColor: theme.colors.primary,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <CustomText
+                        fontSize={theme.fonts.sizes.small}
+                        color={theme.colors.primary}
+                        fontWeight="500"
+                      >
+                        {t("chat.replyingTo")}{" "}
+                        {replyingTo.sender === "user"
+                          ? t("chat.you")
+                          : friendProfile?.name || name}
+                      </CustomText>
+                      <CustomText
+                        fontSize={theme.fonts.sizes.small}
+                        color={theme.colors.secondaryText}
+                        numberOfLines={1}
+                        style={{ marginTop: 2 }}
+                      >
+                        {replyingTo?.mediaType
+                          ? getReplyPreviewText(replyingTo as any, messages)
+                          : replyingTo?.text}
+                      </CustomText>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setReplyingTo(null)}
+                      style={{ marginLeft: 10 }}
+                    >
+                      <Ionicons
+                        name="close"
+                        size={20}
+                        color={theme.colors.secondaryText}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Input Field */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: 10,
+                  paddingTop: 5,
+                  paddingBottom: Platform.select({
+                    ios: 10,
+                    android: 6,
+                  }),
+                }}
+              >
+                <TouchableOpacity
+                  onPress={
+                    uploading || recording !== null
+                      ? undefined
+                      : openAttachmentSheet
+                  }
+                  disabled={uploading || recording !== null}
+                  style={{
+                    marginRight: 10,
+                    padding: 8,
+                    borderRadius: 20,
+                    backgroundColor: theme.colors.inputBackground,
+                  }}
+                >
+                  <Ionicons
+                    name="add"
+                    size={24}
+                    color={
+                      uploading || recording !== null
+                        ? theme.colors.secondaryText
+                        : theme.colors.primary
+                    }
+                  />
+                </TouchableOpacity>
+
+                {recording ? (
                   <View
                     style={{
                       flex: 1,
-                      height: WAVEFORM_H,
                       flexDirection: "row",
-                      alignItems: "flex-end",
+                      alignItems: "center",
+                      height: 44,
+                      paddingHorizontal: 12,
+                      backgroundColor: theme.colors.inputBackground,
+                      borderRadius: 16,
                       marginRight: 10,
                     }}
-                    onLayout={(e) => {
-                      const w = e.nativeEvent.layout.width;
-                      if (w !== waveformWidth) setWaveformWidth(w);
-                    }}
                   >
-                    {waveHeights.map((h, i) => (
-                      <View
-                        key={i}
-                        style={{
-                          width: BAR_WIDTH,
-                          height: h,
-                          borderRadius: 1,
-                          marginRight:
-                            i === waveHeights.length - 1 ? 0 : BAR_SPACING,
-                          backgroundColor: theme.colors.primary,
-                          opacity: 0.9,
-                        }}
-                      />
-                    ))}
-                  </View>
-                  {/* Pause/Resume recording */}
-                  <TouchableOpacity
-                    onPress={() =>
-                      isRecordingPaused ? resumeRecording() : pauseRecording()
-                    }
-                    style={{ padding: 6, marginRight: 8 }}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      isRecordingPaused
-                        ? t("chat.resumeRecording") || "Resume recording"
-                        : t("chat.pauseRecording") || "Pause recording"
-                    }
-                  >
-                    <Ionicons
-                      name={isRecordingPaused ? "play" : "pause"}
-                      size={20}
-                      color={theme.colors.primary}
-                    />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={async () => {
-                      try {
-                        if (recording) {
-                          try {
-                            await recording.stopAndUnloadAsync();
-                          } catch (_) {}
-                        }
-                      } finally {
-                        if (recTimerRef.current) {
-                          clearInterval(recTimerRef.current);
-                          recTimerRef.current = null;
-                        }
-                        setRecording(null);
-                        setRecSeconds(0);
+                    <CustomText
+                      color={theme.colors.text}
+                      style={{ fontVariant: ["tabular-nums"], marginRight: 10 }}
+                    >
+                      {`${Math.floor(recSeconds / 60)}:${(recSeconds % 60)
+                        .toString()
+                        .padStart(2, "0")}`}
+                    </CustomText>
+                    <View
+                      style={{
+                        flex: 1,
+                        height: WAVEFORM_H,
+                        flexDirection: "row",
+                        alignItems: "flex-end",
+                        marginRight: 10,
+                      }}
+                      onLayout={(e) => {
+                        const w = e.nativeEvent.layout.width;
+                        if (w !== waveformWidth) setWaveformWidth(w);
+                      }}
+                    >
+                      {waveHeights.map((h, i) => (
+                        <View
+                          key={i}
+                          style={{
+                            width: BAR_WIDTH,
+                            height: h,
+                            borderRadius: 1,
+                            marginRight:
+                              i === waveHeights.length - 1 ? 0 : BAR_SPACING,
+                            backgroundColor: theme.colors.primary,
+                            opacity: 0.9,
+                          }}
+                        />
+                      ))}
+                    </View>
+                    {/* Pause/Resume recording */}
+                    <TouchableOpacity
+                      onPress={() =>
+                        isRecordingPaused ? resumeRecording() : pauseRecording()
                       }
-                    }}
-                    style={{ padding: 6, marginRight: 8 }}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      t("chat.discardRecording") || "Discard recording"
-                    }
-                  >
-                    <Ionicons name="trash-outline" size={20} color="#FF4D4D" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TextInput
-                  style={{
-                    flex: 1,
-                    borderWidth: 1,
-                    borderColor: theme.colors.inputBackground,
-                    borderRadius: 20,
-                    paddingHorizontal: 15,
-                    paddingVertical: Platform.select({
-                      ios: 10,
-                      android: 8,
-                    }),
-                    backgroundColor: theme.colors.inputBackground,
-                    color: theme.colors.text,
-                    fontSize: theme.fonts.sizes.regular,
-                    maxHeight: 100,
-                  }}
-                  multiline
-                  value={newMessage}
-                  onChangeText={setNewMessage}
-                  placeholder={
-                    selectedMediaFiles.length > 0
-                      ? t("Add Caption")
-                      : editingMessage
-                      ? t("chat.editYourMessage")
-                      : replyingTo
-                      ? t("chat.replyTo", {
-                          name:
-                            replyingTo.sender === "user"
-                              ? t("chat.yourself")
-                              : friendProfile?.name || name,
-                        })
-                      : t("chat.typeMessage")
-                  }
-                  placeholderTextColor={theme.colors.secondaryText}
-                  onFocus={() => {}}
-                  returnKeyType="send"
-                  onSubmitEditing={sendMessage}
-                  editable={!uploading && !recording}
-                />
-              )}
+                      style={{ padding: 6, marginRight: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        isRecordingPaused
+                          ? t("chat.resumeRecording") || "Resume recording"
+                          : t("chat.pauseRecording") || "Pause recording"
+                      }
+                    >
+                      <Ionicons
+                        name={isRecordingPaused ? "play" : "pause"}
+                        size={20}
+                        color={theme.colors.primary}
+                      />
+                    </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={
-                  recording
-                    ? stopRecording
-                    : newMessage.trim() || selectedMediaFiles.length > 0
-                    ? sendMessage
-                    : startRecording
-                }
-                disabled={uploading}
-                style={{
-                  marginLeft: 10,
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor:
-                    recording ||
-                    newMessage.trim() ||
-                    selectedMediaFiles.length > 0
-                      ? theme.colors.primary
-                      : theme.colors.inputBackground,
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  recording
-                    ? t("chat.sendRecording") || "Send recording"
-                    : newMessage.trim() || selectedMediaFiles.length > 0
-                    ? t("chat.sendMessage") || "Send message"
-                    : t("chat.startRecording") || "Start recording"
-                }
-              >
-                <Ionicons
-                  name={
-                    recording ||
-                    newMessage.trim() ||
-                    selectedMediaFiles.length > 0
-                      ? "send"
-                      : "mic"
+                    <TouchableOpacity
+                      onPress={async () => {
+                        try {
+                          if (recording) {
+                            try {
+                              await recording.stopAndUnloadAsync();
+                            } catch (_) {}
+                          }
+                        } finally {
+                          if (recTimerRef.current) {
+                            clearInterval(recTimerRef.current);
+                            recTimerRef.current = null;
+                          }
+                          setRecording(null);
+                          setRecSeconds(0);
+                        }
+                      }}
+                      style={{ padding: 6, marginRight: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        t("chat.discardRecording") || "Discard recording"
+                      }
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={20}
+                        color="#FF4D4D"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: theme.colors.inputBackground,
+                      borderRadius: 20,
+                      paddingHorizontal: 15,
+                      paddingVertical: Platform.select({
+                        ios: 10,
+                        android: 8,
+                      }),
+                      backgroundColor: theme.colors.inputBackground,
+                      color: theme.colors.text,
+                      fontSize: theme.fonts.sizes.regular,
+                      maxHeight: 100,
+                    }}
+                    inputMode="text" // Add this line to enable GIF support
+                    multiline
+                    value={newMessage}
+                    onChangeText={setNewMessage}
+                    placeholder={
+                      selectedMediaFiles.length > 0
+                        ? t("Add Caption")
+                        : editingMessage
+                        ? t("chat.editYourMessage")
+                        : replyingTo
+                        ? t("chat.replyTo", {
+                            name:
+                              replyingTo.sender === "user"
+                                ? t("chat.yourself")
+                                : friendProfile?.name || name,
+                          })
+                        : t("chat.typeMessage")
+                    }
+                    placeholderTextColor={theme.colors.secondaryText}
+                    onFocus={() => {}}
+                    returnKeyType="send"
+                    onSubmitEditing={sendMessage}
+                    editable={!uploading && !recording}
+                    keyboardType="default" // Ensures full keyboard features
+                    textContentType="none" // Prevents iOS from suggesting content types
+                    autoCorrect={true} // Enable autocorrect
+                    autoCapitalize="sentences" // Proper capitalization
+                    enablesReturnKeyAutomatically={true} // Enable return key only when text exists
+                    blurOnSubmit={false} // Prevent keyboard from closing on submit
+                  />
+                )}
+
+                <TouchableOpacity
+                  onPress={
+                    recording
+                      ? stopRecording
+                      : newMessage.trim() || selectedMediaFiles.length > 0
+                      ? sendMessage
+                      : startRecording
                   }
-                  size={22}
-                  color={
-                    recording ||
-                    newMessage.trim() ||
-                    selectedMediaFiles.length > 0
-                      ? "white"
-                      : theme.colors.primary
+                  disabled={uploading}
+                  style={{
+                    marginLeft: 10,
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor:
+                      recording ||
+                      newMessage.trim() ||
+                      selectedMediaFiles.length > 0
+                        ? theme.colors.primary
+                        : theme.colors.inputBackground,
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    recording
+                      ? t("chat.sendRecording") || "Send recording"
+                      : newMessage.trim() || selectedMediaFiles.length > 0
+                      ? t("chat.sendMessage") || "Send message"
+                      : t("chat.startRecording") || "Start recording"
                   }
-                />
-              </TouchableOpacity>
+                >
+                  <Ionicons
+                    name={
+                      recording ||
+                      newMessage.trim() ||
+                      selectedMediaFiles.length > 0
+                        ? "send"
+                        : "mic"
+                    }
+                    size={22}
+                    color={
+                      recording ||
+                      newMessage.trim() ||
+                      selectedMediaFiles.length > 0
+                        ? "white"
+                        : theme.colors.primary
+                    }
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
         </KeyboardAvoidingView>
 
         {/* Modals */}
@@ -3202,9 +3243,9 @@ useEffect(() => {
             ) : null}
           </View>
         </Modal>
-        </SafeAreaView>
-      </GestureHandlerRootView>
-    );
-  }
+      </SafeAreaView>
+    </GestureHandlerRootView>
+  );
+}
 
-  export default ChatRoom;
+export default ChatRoom;
